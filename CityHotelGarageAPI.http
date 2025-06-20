@@ -1,0 +1,6 @@
+@CityHotelGarageAPI_HostAddress = http://localhost:5010
+
+GET {{CityHotelGarageAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

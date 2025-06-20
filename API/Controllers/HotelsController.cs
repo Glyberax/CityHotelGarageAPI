@@ -1,8 +1,9 @@
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using CityHotelGarageAPI.Repository.Data;
+using CityHotelGarageAPI.Repository.Models;
 
-namespace CityHotelGarageAPI;
+namespace CityHotelGarageAPI.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -95,7 +96,7 @@ public class HotelsController : ControllerBase
             return BadRequest();
         }
 
-        // Şehir var mı kontrol et
+        // Şehir var mı kontrol
         var cityExists = await _context.Cities.AnyAsync(c => c.Id == hotel.CityId);
         if (!cityExists)
         {

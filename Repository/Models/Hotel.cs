@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace CityHotelGarageAPI;
+namespace CityHotelGarageAPI.Repository.Models;
 
 public class Hotel
 {

@@ -1,4 +1,9 @@
-global using CityHotelGarageAPI;
+using CityHotelGarageAPI.Repository.Data;
+using CityHotelGarageAPI.Repository.Models;
+using CityHotelGarageAPI.Repository.Interfaces;
+using CityHotelGarageAPI.Repository.Repositories;
+using CityHotelGarageAPI.Operations.Interfaces;
+using CityHotelGarageAPI.Operations.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,11 +13,21 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Entity Framework DbContext'i ekle
+// Repository Pattern - Dependency Injection
+builder.Services.AddScoped<ICityRepository, CityRepository>();
+builder.Services.AddScoped<IHotelRepository, HotelRepository>();
+builder.Services.AddScoped<IGarageRepository, GarageRepository>();
+builder.Services.AddScoped<ICarRepository, CarRepository>();
+
+// Service Pattern - Dependency Injection
+builder.Services.AddScoped<ICityService, CityService>();
+builder.Services.AddScoped<ICarService, CarService>();
+
+// Entity Framework DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql("Host=localhost;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512"));
 
-// CORS ekle (frontend bağlantısı için)
+// CORS ekle (frontend bağlantısı geliştirilmesi için)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
@@ -38,7 +53,6 @@ app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 
-// Veritabanını oluştur ve demo veri ekle
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using CityHotelGarageAPI.Repository.Models;
 
-namespace CityHotelGarageAPI;
+namespace CityHotelGarageAPI.Repository.Data;
 
 public class AppDbContext : DbContext
 {

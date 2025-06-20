@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using CityHotelGarageAPI.Repository.Data;
+using CityHotelGarageAPI.Repository.Models;
 
-namespace CityHotelGarageAPI;
+namespace CityHotelGarageAPI.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

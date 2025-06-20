@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace CityHotelGarageAPI;
+namespace CityHotelGarageAPI.Repository.Models;
 public class City
 {
     [Key]

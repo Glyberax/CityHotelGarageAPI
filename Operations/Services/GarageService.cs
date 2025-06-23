@@ -1,3 +1,4 @@
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using CityHotelGarageAPI.Operations.DTOs;
 using CityHotelGarageAPI.Operations.Extensions;
@@ -12,11 +13,13 @@ public class GarageService : IGarageService
 {
     private readonly IGarageRepository _garageRepository;
     private readonly IHotelRepository _hotelRepository;
+    private readonly IMapper _mapper;
 
-    public GarageService(IGarageRepository garageRepository, IHotelRepository hotelRepository)
+    public GarageService(IGarageRepository garageRepository, IHotelRepository hotelRepository, IMapper mapper)
     {
         _garageRepository = garageRepository;
         _hotelRepository = hotelRepository;
+        _mapper = mapper;
     }
 
     public async Task<ServiceResult<IEnumerable<GarageDto>>> GetAllGaragesAsync()
@@ -24,7 +27,7 @@ public class GarageService : IGarageService
         try
         {
             var garageDtos = await _garageRepository.GetGaragesWithDetails()
-                .ProjectToGarageDto()
+                .ProjectToGarageDto(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
             return ServiceResult<IEnumerable<GarageDto>>.Success(garageDtos, "Garajlar başarıyla getirildi.");
@@ -41,7 +44,7 @@ public class GarageService : IGarageService
         {
             var garageDto = await _garageRepository.GetGaragesWithDetails()
                 .Where(g => g.Id == id)
-                .ProjectToGarageDto()
+                .ProjectToGarageDto(_mapper.ConfigurationProvider)
                 .FirstOrDefaultAsync();
 
             if (garageDto == null)
@@ -62,7 +65,7 @@ public class GarageService : IGarageService
         try
         {
             var garageDtos = await _garageRepository.GetGaragesByHotel(hotelId)
-                .ProjectToGarageDto()
+                .ProjectToGarageDto(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
             return ServiceResult<IEnumerable<GarageDto>>.Success(garageDtos, "Oteldeki garajlar başarıyla getirildi.");
@@ -84,20 +87,14 @@ public class GarageService : IGarageService
                 return ServiceResult<GarageDto>.Failure("Belirtilen otel bulunamadı.");
             }
 
-            var garage = new Garage
-            {
-                Name = garageDto.Name,
-                Capacity = garageDto.Capacity,
-                HotelId = garageDto.HotelId,
-                CreatedDate = DateTime.UtcNow
-            };
-
+            // AutoMapper ile DTO'yu Entity'e çevir
+            var garage = _mapper.Map<Garage>(garageDto);
             var createdGarage = await _garageRepository.AddAsync(garage);
 
-            // Projection ile detaylı bilgiyi al
+            // AutoMapper projection ile detaylı bilgiyi al
             var resultDto = await _garageRepository.GetGaragesWithDetails()
                 .Where(g => g.Id == createdGarage.Id)
-                .ProjectToGarageDto()
+                .ProjectToGarageDto(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<GarageDto>.Success(resultDto, "Garaj başarıyla oluşturuldu.");
@@ -125,16 +122,14 @@ public class GarageService : IGarageService
                 return ServiceResult<GarageDto>.Failure("Belirtilen otel bulunamadı.");
             }
 
-            existingGarage.Name = garageDto.Name;
-            existingGarage.Capacity = garageDto.Capacity;
-            existingGarage.HotelId = garageDto.HotelId;
-
+            // AutoMapper ile güncelleme
+            _mapper.Map(garageDto, existingGarage);
             await _garageRepository.UpdateAsync(existingGarage);
 
-            // Projection ile güncellenmiş veriyi al
+            // AutoMapper projection ile güncellenmiş veriyi al
             var resultDto = await _garageRepository.GetGaragesWithDetails()
                 .Where(g => g.Id == id)
-                .ProjectToGarageDto()
+                .ProjectToGarageDto(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<GarageDto>.Success(resultDto, "Garaj başarıyla güncellendi.");

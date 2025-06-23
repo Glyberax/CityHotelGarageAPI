@@ -1,6 +1,7 @@
+using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using CityHotelGarageAPI.Operations.DTOs;
-using CityHotelGarageAPI.Operations.Extensions;
 using CityHotelGarageAPI.Operations.Interfaces;
 using CityHotelGarageAPI.Operations.Results;
 using CityHotelGarageAPI.Repository.Interfaces;
@@ -12,19 +13,22 @@ public class CarService : ICarService
 {
     private readonly ICarRepository _carRepository;
     private readonly IGarageRepository _garageRepository;
+    private readonly IMapper _mapper;
 
-    public CarService(ICarRepository carRepository, IGarageRepository garageRepository)
+    public CarService(ICarRepository carRepository, IGarageRepository garageRepository, IMapper mapper)
     {
         _carRepository = carRepository;
         _garageRepository = garageRepository;
+        _mapper = mapper;
     }
 
     public async Task<ServiceResult<IEnumerable<CarDto>>> GetAllCarsAsync()
     {
         try
         {
+            // Direct AutoMapper projection - extension olmadan
             var carDtos = await _carRepository.GetCarsWithDetails()
-                .ProjectToCarDto()
+                .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
             return ServiceResult<IEnumerable<CarDto>>.Success(carDtos, "Arabalar başarıyla getirildi.");
@@ -41,7 +45,7 @@ public class CarService : ICarService
         {
             var carDto = await _carRepository.GetCarsWithDetails()
                 .Where(c => c.Id == id)
-                .ProjectToCarDto()
+                .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
                 .FirstOrDefaultAsync();
 
             if (carDto == null)
@@ -63,7 +67,7 @@ public class CarService : ICarService
         {
             var carDto = await _carRepository.GetCarsWithDetails()
                 .Where(c => c.LicensePlate == licensePlate)
-                .ProjectToCarDto()
+                .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
                 .FirstOrDefaultAsync();
 
             if (carDto == null)
@@ -97,21 +101,14 @@ public class CarService : ICarService
                 return ServiceResult<CarDto>.Failure("Bu garaj dolu! Başka bir garaj seçin.");
             }
 
-            var car = new Car
-            {
-                Brand = carDto.Brand,
-                LicensePlate = carDto.LicensePlate,
-                OwnerName = carDto.OwnerName,
-                GarageId = carDto.GarageId,
-                EntryTime = DateTime.UtcNow
-            };
-
+            // AutoMapper ile DTO'yu Entity'e çevir
+            var car = _mapper.Map<Car>(carDto);
             var createdCar = await _carRepository.AddAsync(car);
             
-            // Projection ile detaylı bilgiyi al
+            // Direct AutoMapper projection
             var resultDto = await _carRepository.GetCarsWithDetails()
                 .Where(c => c.Id == createdCar.Id)
-                .ProjectToCarDto()
+                .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<CarDto>.Success(resultDto, "Araba başarıyla park edildi.");
@@ -139,17 +136,14 @@ public class CarService : ICarService
                 return ServiceResult<CarDto>.Failure("Bu plaka başka bir araba tarafından kullanılıyor!");
             }
 
-            existingCar.Brand = carDto.Brand;
-            existingCar.LicensePlate = carDto.LicensePlate;
-            existingCar.OwnerName = carDto.OwnerName;
-            existingCar.GarageId = carDto.GarageId;
-
+            // AutoMapper ile güncelleme
+            _mapper.Map(carDto, existingCar);
             await _carRepository.UpdateAsync(existingCar);
             
-            // Projection ile güncellenmiş veriyi al
+            // Direct AutoMapper projection
             var resultDto = await _carRepository.GetCarsWithDetails()
                 .Where(c => c.Id == id)
-                .ProjectToCarDto()
+                .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<CarDto>.Success(resultDto, "Araba başarıyla güncellendi.");

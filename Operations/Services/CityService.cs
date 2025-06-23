@@ -1,3 +1,4 @@
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using CityHotelGarageAPI.Operations.DTOs;
 using CityHotelGarageAPI.Operations.Extensions;
@@ -11,10 +12,12 @@ namespace CityHotelGarageAPI.Operations.Services;
 public class CityService : ICityService
 {
     private readonly ICityRepository _cityRepository;
+    private readonly IMapper _mapper;
 
-    public CityService(ICityRepository cityRepository)
+    public CityService(ICityRepository cityRepository, IMapper mapper)
     {
         _cityRepository = cityRepository;
+        _mapper = mapper;
     }
 
     public async Task<ServiceResult<IEnumerable<CityDto>>> GetAllCitiesAsync()
@@ -22,7 +25,7 @@ public class CityService : ICityService
         try
         {
             var cityDtos = await _cityRepository.GetCitiesWithHotels()
-                .ProjectToCityDto()
+                .ProjectToCityDto(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
             return ServiceResult<IEnumerable<CityDto>>.Success(cityDtos, "Şehirler başarıyla getirildi.");
@@ -39,7 +42,7 @@ public class CityService : ICityService
         {
             var cityDto = await _cityRepository.GetCitiesWithHotels()
                 .Where(c => c.Id == id)
-                .ProjectToCityDto()
+                .ProjectToCityDto(_mapper.ConfigurationProvider)
                 .FirstOrDefaultAsync();
 
             if (cityDto == null)
@@ -59,19 +62,14 @@ public class CityService : ICityService
     {
         try
         {
-            var city = new City
-            {
-                Name = cityDto.Name,
-                Population = cityDto.Population,
-                CreatedDate = DateTime.UtcNow
-            };
-
+            // AutoMapper ile DTO'yu Entity'e çevir
+            var city = _mapper.Map<City>(cityDto);
             var createdCity = await _cityRepository.AddAsync(city);
 
-            // Projection ile detaylı bilgiyi al
+            // AutoMapper projection ile detaylı bilgiyi al
             var resultDto = await _cityRepository.GetCitiesWithHotels()
                 .Where(c => c.Id == createdCity.Id)
-                .ProjectToCityDto()
+                .ProjectToCityDto(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<CityDto>.Success(resultDto, "Şehir başarıyla oluşturuldu.");
@@ -92,15 +90,14 @@ public class CityService : ICityService
                 return ServiceResult<CityDto>.Failure("Güncellenecek şehir bulunamadı.");
             }
 
-            existingCity.Name = cityDto.Name;
-            existingCity.Population = cityDto.Population;
-
+            // AutoMapper ile güncelleme
+            _mapper.Map(cityDto, existingCity);
             await _cityRepository.UpdateAsync(existingCity);
 
-            // Projection ile güncellenmiş veriyi al
+            // AutoMapper projection ile güncellenmiş veriyi al
             var resultDto = await _cityRepository.GetCitiesWithHotels()
                 .Where(c => c.Id == id)
-                .ProjectToCityDto()
+                .ProjectToCityDto(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<CityDto>.Success(resultDto, "Şehir başarıyla güncellendi.");

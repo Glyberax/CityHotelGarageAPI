@@ -1,3 +1,4 @@
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using CityHotelGarageAPI.Operations.DTOs;
 using CityHotelGarageAPI.Operations.Extensions;
@@ -12,11 +13,13 @@ public class HotelService : IHotelService
 {
     private readonly IHotelRepository _hotelRepository;
     private readonly ICityRepository _cityRepository;
+    private readonly IMapper _mapper;
 
-    public HotelService(IHotelRepository hotelRepository, ICityRepository cityRepository)
+    public HotelService(IHotelRepository hotelRepository, ICityRepository cityRepository, IMapper mapper)
     {
         _hotelRepository = hotelRepository;
         _cityRepository = cityRepository;
+        _mapper = mapper;
     }
 
     public async Task<ServiceResult<IEnumerable<HotelDto>>> GetAllHotelsAsync()
@@ -24,7 +27,7 @@ public class HotelService : IHotelService
         try
         {
             var hotelDtos = await _hotelRepository.GetHotelsWithDetails()
-                .ProjectToHotelDto()
+                .ProjectToHotelDto(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
             return ServiceResult<IEnumerable<HotelDto>>.Success(hotelDtos, "Oteller başarıyla getirildi.");
@@ -41,7 +44,7 @@ public class HotelService : IHotelService
         {
             var hotelDto = await _hotelRepository.GetHotelsWithDetails()
                 .Where(h => h.Id == id)
-                .ProjectToHotelDto()
+                .ProjectToHotelDto(_mapper.ConfigurationProvider)
                 .FirstOrDefaultAsync();
 
             if (hotelDto == null)
@@ -62,7 +65,7 @@ public class HotelService : IHotelService
         try
         {
             var hotelDtos = await _hotelRepository.GetHotelsByCity(cityId)
-                .ProjectToHotelDto()
+                .ProjectToHotelDto(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
             return ServiceResult<IEnumerable<HotelDto>>.Success(hotelDtos, "Şehirdeki oteller başarıyla getirildi.");
@@ -84,20 +87,14 @@ public class HotelService : IHotelService
                 return ServiceResult<HotelDto>.Failure("Belirtilen şehir bulunamadı.");
             }
 
-            var hotel = new Hotel
-            {
-                Name = hotelDto.Name,
-                Yildiz = hotelDto.Yildiz,
-                CityId = hotelDto.CityId,
-                CreatedDate = DateTime.UtcNow
-            };
-
+            // AutoMapper ile DTO'yu Entity'e çevir
+            var hotel = _mapper.Map<Hotel>(hotelDto);
             var createdHotel = await _hotelRepository.AddAsync(hotel);
 
-            // Projection ile detaylı bilgiyi al
+            // AutoMapper projection ile detaylı bilgiyi al
             var resultDto = await _hotelRepository.GetHotelsWithDetails()
                 .Where(h => h.Id == createdHotel.Id)
-                .ProjectToHotelDto()
+                .ProjectToHotelDto(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<HotelDto>.Success(resultDto, "Otel başarıyla oluşturuldu.");
@@ -125,16 +122,14 @@ public class HotelService : IHotelService
                 return ServiceResult<HotelDto>.Failure("Belirtilen şehir bulunamadı.");
             }
 
-            existingHotel.Name = hotelDto.Name;
-            existingHotel.Yildiz = hotelDto.Yildiz;
-            existingHotel.CityId = hotelDto.CityId;
-
+            // AutoMapper ile güncelleme
+            _mapper.Map(hotelDto, existingHotel);
             await _hotelRepository.UpdateAsync(existingHotel);
 
-            // Projection ile güncellenmiş veriyi al
+            // AutoMapper projection ile güncellenmiş veriyi al
             var resultDto = await _hotelRepository.GetHotelsWithDetails()
                 .Where(h => h.Id == id)
-                .ProjectToHotelDto()
+                .ProjectToHotelDto(_mapper.ConfigurationProvider)
                 .FirstAsync();
 
             return ServiceResult<HotelDto>.Success(resultDto, "Otel başarıyla güncellendi.");

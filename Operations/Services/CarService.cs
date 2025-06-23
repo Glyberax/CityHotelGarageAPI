@@ -26,7 +26,7 @@ public class CarService : ICarService
     {
         try
         {
-            // Direct AutoMapper projection - extension olmadan
+            // AutoMapper projection
             var carDtos = await _carRepository.GetCarsWithDetails()
                 .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
                 .ToListAsync();
@@ -105,7 +105,7 @@ public class CarService : ICarService
             var car = _mapper.Map<Car>(carDto);
             var createdCar = await _carRepository.AddAsync(car);
             
-            // Direct AutoMapper projection
+            // AutoMapper projection
             var resultDto = await _carRepository.GetCarsWithDetails()
                 .Where(c => c.Id == createdCar.Id)
                 .ProjectTo<CarDto>(_mapper.ConfigurationProvider)
@@ -129,7 +129,7 @@ public class CarService : ICarService
                 return ServiceResult<CarDto>.Failure("Güncellenecek araba bulunamadı.");
             }
 
-            // Plaka kontrolü (kendisi hariç)
+            // Plaka kontrolü
             var existingCarWithPlate = await _carRepository.GetCarByLicensePlateAsync(carDto.LicensePlate);
             if (existingCarWithPlate != null && existingCarWithPlate.Id != id)
             {
@@ -140,7 +140,7 @@ public class CarService : ICarService
             _mapper.Map(carDto, existingCar);
             await _carRepository.UpdateAsync(existingCar);
             
-            // Direct AutoMapper projection
+            // AutoMapper projection
             var resultDto = await _carRepository.GetCarsWithDetails()
                 .Where(c => c.Id == id)
                 .ProjectTo<CarDto>(_mapper.ConfigurationProvider)

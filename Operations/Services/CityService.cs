@@ -66,7 +66,7 @@ public class CityService : ICityService
             var city = _mapper.Map<City>(cityDto);
             var createdCity = await _cityRepository.AddAsync(city);
 
-            // AutoMapper projection ile detaylı bilgiyi al
+            // AutoMapper projection ile bilgiyi al
             var resultDto = await _cityRepository.GetCitiesWithHotels()
                 .Where(c => c.Id == createdCity.Id)
                 .ProjectToCityDto(_mapper.ConfigurationProvider)

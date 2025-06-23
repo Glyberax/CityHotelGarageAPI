@@ -91,7 +91,7 @@ public class HotelService : IHotelService
             var hotel = _mapper.Map<Hotel>(hotelDto);
             var createdHotel = await _hotelRepository.AddAsync(hotel);
 
-            // AutoMapper projection ile detaylı bilgiyi al
+            // AutoMapper projection ile bilgiyi al
             var resultDto = await _hotelRepository.GetHotelsWithDetails()
                 .Where(h => h.Id == createdHotel.Id)
                 .ProjectToHotelDto(_mapper.ConfigurationProvider)

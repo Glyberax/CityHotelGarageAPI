@@ -6,9 +6,7 @@ using CityHotelGarageAPI.Repository.Models;
 namespace CityHotelGarageAPI.Operations.Extensions;
 
 public static class AutoMapperExtensions
-{
-    // IQueryable projection extension methods using AutoMapper
-    // Fully qualified AutoMapper.IConfigurationProvider kullanarak namespace conflict'i çözüyoruz
+{ 
     
     public static IQueryable<CarDto> ProjectToCarDto(this IQueryable<Car> query, AutoMapper.IConfigurationProvider configuration)
     {

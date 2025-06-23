@@ -10,14 +10,14 @@ using AutoMapper;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    
 });
 
-// AutoMapper Configuration - Namespace conflict çözümü ile
+// AutoMapper Configuration
 builder.Services.AddSingleton(provider => new MapperConfiguration(cfg =>
 {
     cfg.AddProfile<AutoMapperProfile>();
@@ -40,7 +40,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql("Host=localhost;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512");
     
-    // Development ortamında SQL loglarını göster
     if (builder.Environment.IsDevelopment())
     {
         options.EnableSensitiveDataLogging();

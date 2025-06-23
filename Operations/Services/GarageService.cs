@@ -91,7 +91,7 @@ public class GarageService : IGarageService
             var garage = _mapper.Map<Garage>(garageDto);
             var createdGarage = await _garageRepository.AddAsync(garage);
 
-            // AutoMapper projection ile detaylı bilgiyi al
+            // AutoMapper projection ile bilgiyi al
             var resultDto = await _garageRepository.GetGaragesWithDetails()
                 .Where(g => g.Id == createdGarage.Id)
                 .ProjectToGarageDto(_mapper.ConfigurationProvider)

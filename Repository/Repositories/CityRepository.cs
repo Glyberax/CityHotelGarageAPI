@@ -11,17 +11,15 @@ public class CityRepository : BaseRepository<City>, ICityRepository
     {
     }
 
-    public async Task<IEnumerable<City>> GetCitiesWithHotelsAsync()
+    public IQueryable<City> GetCitiesWithHotels()
     {
-        return await _context.Cities
-            .Include(c => c.Hotels)
-            .ToListAsync();
+        return _context.Cities
+            .Include(c => c.Hotels);
     }
 
     public async Task<City?> GetCityWithHotelsAsync(int id)
     {
-        return await _context.Cities
-            .Include(c => c.Hotels)
+        return await GetCitiesWithHotels()
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 }

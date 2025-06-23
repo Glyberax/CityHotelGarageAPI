@@ -4,7 +4,7 @@ namespace CityHotelGarageAPI.Repository.Interfaces;
 
 public interface IHotelRepository : IBaseRepository<Hotel>
 {
-    Task<IEnumerable<Hotel>> GetHotelsWithDetailsAsync();
+    IQueryable<Hotel> GetHotelsWithDetails();
     Task<Hotel?> GetHotelWithDetailsAsync(int id);
-    Task<IEnumerable<Hotel>> GetHotelsByCityAsync(int cityId);
+    IQueryable<Hotel> GetHotelsByCity(int cityId);
 }

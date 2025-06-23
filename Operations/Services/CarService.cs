@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using CityHotelGarageAPI.Operations.DTOs;
+using CityHotelGarageAPI.Operations.Extensions;
 using CityHotelGarageAPI.Operations.Interfaces;
 using CityHotelGarageAPI.Operations.Results;
 using CityHotelGarageAPI.Repository.Interfaces;
@@ -21,19 +23,9 @@ public class CarService : ICarService
     {
         try
         {
-            var cars = await _carRepository.GetCarsWithDetailsAsync();
-            var carDtos = cars.Select(c => new CarDto
-            {
-                Id = c.Id,
-                Brand = c.Brand,
-                LicensePlate = c.LicensePlate,
-                OwnerName = c.OwnerName,
-                EntryTime = c.EntryTime,
-                GarageId = c.GarageId,
-                GarageName = c.Garage?.Name ?? "",
-                HotelName = c.Garage?.Hotel?.Name ?? "",
-                CityName = c.Garage?.Hotel?.City?.Name ?? ""
-            });
+            var carDtos = await _carRepository.GetCarsWithDetails()
+                .ProjectToCarDto()
+                .ToListAsync();
 
             return ServiceResult<IEnumerable<CarDto>>.Success(carDtos, "Arabalar başarıyla getirildi.");
         }
@@ -47,24 +39,15 @@ public class CarService : ICarService
     {
         try
         {
-            var car = await _carRepository.GetCarWithDetailsAsync(id);
-            if (car == null)
+            var carDto = await _carRepository.GetCarsWithDetails()
+                .Where(c => c.Id == id)
+                .ProjectToCarDto()
+                .FirstOrDefaultAsync();
+
+            if (carDto == null)
             {
                 return ServiceResult<CarDto>.Failure("Araba bulunamadı.");
             }
-
-            var carDto = new CarDto
-            {
-                Id = car.Id,
-                Brand = car.Brand,
-                LicensePlate = car.LicensePlate,
-                OwnerName = car.OwnerName,
-                EntryTime = car.EntryTime,
-                GarageId = car.GarageId,
-                GarageName = car.Garage?.Name ?? "",
-                HotelName = car.Garage?.Hotel?.Name ?? "",
-                CityName = car.Garage?.Hotel?.City?.Name ?? ""
-            };
 
             return ServiceResult<CarDto>.Success(carDto, "Araba başarıyla getirildi.");
         }
@@ -78,24 +61,15 @@ public class CarService : ICarService
     {
         try
         {
-            var car = await _carRepository.GetCarByLicensePlateAsync(licensePlate);
-            if (car == null)
+            var carDto = await _carRepository.GetCarsWithDetails()
+                .Where(c => c.LicensePlate == licensePlate)
+                .ProjectToCarDto()
+                .FirstOrDefaultAsync();
+
+            if (carDto == null)
             {
                 return ServiceResult<CarDto>.Failure("Belirtilen plaka ile araba bulunamadı.");
             }
-
-            var carDto = new CarDto
-            {
-                Id = car.Id,
-                Brand = car.Brand,
-                LicensePlate = car.LicensePlate,
-                OwnerName = car.OwnerName,
-                EntryTime = car.EntryTime,
-                GarageId = car.GarageId,
-                GarageName = car.Garage?.Name ?? "",
-                HotelName = car.Garage?.Hotel?.Name ?? "",
-                CityName = car.Garage?.Hotel?.City?.Name ?? ""
-            };
 
             return ServiceResult<CarDto>.Success(carDto, "Araba başarıyla getirildi.");
         }
@@ -134,21 +108,11 @@ public class CarService : ICarService
 
             var createdCar = await _carRepository.AddAsync(car);
             
-            // Detaylı bilgiyi almak için tekrar sorgula
-            var carWithDetails = await _carRepository.GetCarWithDetailsAsync(createdCar.Id);
-
-            var resultDto = new CarDto
-            {
-                Id = carWithDetails!.Id,
-                Brand = carWithDetails.Brand,
-                LicensePlate = carWithDetails.LicensePlate,
-                OwnerName = carWithDetails.OwnerName,
-                EntryTime = carWithDetails.EntryTime,
-                GarageId = carWithDetails.GarageId,
-                GarageName = carWithDetails.Garage?.Name ?? "",
-                HotelName = carWithDetails.Garage?.Hotel?.Name ?? "",
-                CityName = carWithDetails.Garage?.Hotel?.City?.Name ?? ""
-            };
+            // Projection ile detaylı bilgiyi al
+            var resultDto = await _carRepository.GetCarsWithDetails()
+                .Where(c => c.Id == createdCar.Id)
+                .ProjectToCarDto()
+                .FirstAsync();
 
             return ServiceResult<CarDto>.Success(resultDto, "Araba başarıyla park edildi.");
         }
@@ -180,23 +144,13 @@ public class CarService : ICarService
             existingCar.OwnerName = carDto.OwnerName;
             existingCar.GarageId = carDto.GarageId;
 
-            var updatedCar = await _carRepository.UpdateAsync(existingCar);
+            await _carRepository.UpdateAsync(existingCar);
             
-            // Detaylı bilgiyi almak için tekrar sorgula
-            var carWithDetails = await _carRepository.GetCarWithDetailsAsync(updatedCar.Id);
-
-            var resultDto = new CarDto
-            {
-                Id = carWithDetails!.Id,
-                Brand = carWithDetails.Brand,
-                LicensePlate = carWithDetails.LicensePlate,
-                OwnerName = carWithDetails.OwnerName,
-                EntryTime = carWithDetails.EntryTime,
-                GarageId = carWithDetails.GarageId,
-                GarageName = carWithDetails.Garage?.Name ?? "",
-                HotelName = carWithDetails.Garage?.Hotel?.Name ?? "",
-                CityName = carWithDetails.Garage?.Hotel?.City?.Name ?? ""
-            };
+            // Projection ile güncellenmiş veriyi al
+            var resultDto = await _carRepository.GetCarsWithDetails()
+                .Where(c => c.Id == id)
+                .ProjectToCarDto()
+                .FirstAsync();
 
             return ServiceResult<CarDto>.Success(resultDto, "Araba başarıyla güncellendi.");
         }

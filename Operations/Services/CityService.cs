@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using CityHotelGarageAPI.Operations.DTOs;
+using CityHotelGarageAPI.Operations.Extensions;
 using CityHotelGarageAPI.Operations.Interfaces;
 using CityHotelGarageAPI.Operations.Results;
 using CityHotelGarageAPI.Repository.Interfaces;
@@ -19,15 +21,9 @@ public class CityService : ICityService
     {
         try
         {
-            var cities = await _cityRepository.GetCitiesWithHotelsAsync();
-            var cityDtos = cities.Select(c => new CityDto
-            {
-                Id = c.Id,
-                Name = c.Name,
-                Population = c.Population,
-                CreatedDate = c.CreatedDate,
-                HotelCount = c.Hotels.Count
-            });
+            var cityDtos = await _cityRepository.GetCitiesWithHotels()
+                .ProjectToCityDto()
+                .ToListAsync();
 
             return ServiceResult<IEnumerable<CityDto>>.Success(cityDtos, "Şehirler başarıyla getirildi.");
         }
@@ -41,20 +37,15 @@ public class CityService : ICityService
     {
         try
         {
-            var city = await _cityRepository.GetCityWithHotelsAsync(id);
-            if (city == null)
+            var cityDto = await _cityRepository.GetCitiesWithHotels()
+                .Where(c => c.Id == id)
+                .ProjectToCityDto()
+                .FirstOrDefaultAsync();
+
+            if (cityDto == null)
             {
                 return ServiceResult<CityDto>.Failure("Şehir bulunamadı.");
             }
-
-            var cityDto = new CityDto
-            {
-                Id = city.Id,
-                Name = city.Name,
-                Population = city.Population,
-                CreatedDate = city.CreatedDate,
-                HotelCount = city.Hotels.Count
-            };
 
             return ServiceResult<CityDto>.Success(cityDto, "Şehir başarıyla getirildi.");
         }
@@ -77,14 +68,11 @@ public class CityService : ICityService
 
             var createdCity = await _cityRepository.AddAsync(city);
 
-            var resultDto = new CityDto
-            {
-                Id = createdCity.Id,
-                Name = createdCity.Name,
-                Population = createdCity.Population,
-                CreatedDate = createdCity.CreatedDate,
-                HotelCount = 0
-            };
+            // Projection ile detaylı bilgiyi al
+            var resultDto = await _cityRepository.GetCitiesWithHotels()
+                .Where(c => c.Id == createdCity.Id)
+                .ProjectToCityDto()
+                .FirstAsync();
 
             return ServiceResult<CityDto>.Success(resultDto, "Şehir başarıyla oluşturuldu.");
         }
@@ -107,16 +95,13 @@ public class CityService : ICityService
             existingCity.Name = cityDto.Name;
             existingCity.Population = cityDto.Population;
 
-            var updatedCity = await _cityRepository.UpdateAsync(existingCity);
+            await _cityRepository.UpdateAsync(existingCity);
 
-            var resultDto = new CityDto
-            {
-                Id = updatedCity.Id,
-                Name = updatedCity.Name,
-                Population = updatedCity.Population,
-                CreatedDate = updatedCity.CreatedDate,
-                HotelCount = 0 // Bu bilgiyi almak için ekstra sorgu gerekebilir
-            };
+            // Projection ile güncellenmiş veriyi al
+            var resultDto = await _cityRepository.GetCitiesWithHotels()
+                .Where(c => c.Id == id)
+                .ProjectToCityDto()
+                .FirstAsync();
 
             return ServiceResult<CityDto>.Success(resultDto, "Şehir başarıyla güncellendi.");
         }

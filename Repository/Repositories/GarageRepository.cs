@@ -11,32 +11,24 @@ public class GarageRepository : BaseRepository<Garage>, IGarageRepository
     {
     }
 
-    public async Task<IEnumerable<Garage>> GetGaragesWithDetailsAsync()
+    public IQueryable<Garage> GetGaragesWithDetails()
     {
-        return await _context.Garages
+        return _context.Garages
             .Include(g => g.Hotel)
             .ThenInclude(h => h.City)
-            .Include(g => g.Cars)
-            .ToListAsync();
+            .Include(g => g.Cars);
     }
 
     public async Task<Garage?> GetGarageWithDetailsAsync(int id)
     {
-        return await _context.Garages
-            .Include(g => g.Hotel)
-            .ThenInclude(h => h.City)
-            .Include(g => g.Cars)
+        return await GetGaragesWithDetails()
             .FirstOrDefaultAsync(g => g.Id == id);
     }
 
-    public async Task<IEnumerable<Garage>> GetGaragesByHotelAsync(int hotelId)
+    public IQueryable<Garage> GetGaragesByHotel(int hotelId)
     {
-        return await _context.Garages
-            .Include(g => g.Hotel)
-            .ThenInclude(h => h.City)
-            .Include(g => g.Cars)
-            .Where(g => g.HotelId == hotelId)
-            .ToListAsync();
+        return GetGaragesWithDetails()
+            .Where(g => g.HotelId == hotelId);
     }
 
     public async Task<int> GetAvailableSpacesAsync(int garageId)

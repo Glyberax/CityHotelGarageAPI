@@ -11,28 +11,22 @@ public class HotelRepository : BaseRepository<Hotel>, IHotelRepository
     {
     }
 
-    public async Task<IEnumerable<Hotel>> GetHotelsWithDetailsAsync()
+    public IQueryable<Hotel> GetHotelsWithDetails()
     {
-        return await _context.Hotels
+        return _context.Hotels
             .Include(h => h.City)
-            .Include(h => h.Garages)
-            .ToListAsync();
+            .Include(h => h.Garages);
     }
 
     public async Task<Hotel?> GetHotelWithDetailsAsync(int id)
     {
-        return await _context.Hotels
-            .Include(h => h.City)
-            .Include(h => h.Garages)
+        return await GetHotelsWithDetails()
             .FirstOrDefaultAsync(h => h.Id == id);
     }
 
-    public async Task<IEnumerable<Hotel>> GetHotelsByCityAsync(int cityId)
+    public IQueryable<Hotel> GetHotelsByCity(int cityId)
     {
-        return await _context.Hotels
-            .Include(h => h.City)
-            .Include(h => h.Garages)
-            .Where(h => h.CityId == cityId)
-            .ToListAsync();
+        return GetHotelsWithDetails()
+            .Where(h => h.CityId == cityId);
     }
 }

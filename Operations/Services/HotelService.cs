@@ -1,0 +1,171 @@
+using Microsoft.EntityFrameworkCore;
+using CityHotelGarageAPI.Operations.DTOs;
+using CityHotelGarageAPI.Operations.Extensions;
+using CityHotelGarageAPI.Operations.Interfaces;
+using CityHotelGarageAPI.Operations.Results;
+using CityHotelGarageAPI.Repository.Interfaces;
+using CityHotelGarageAPI.Repository.Models;
+
+namespace CityHotelGarageAPI.Operations.Services;
+
+public class HotelService : IHotelService
+{
+    private readonly IHotelRepository _hotelRepository;
+    private readonly ICityRepository _cityRepository;
+
+    public HotelService(IHotelRepository hotelRepository, ICityRepository cityRepository)
+    {
+        _hotelRepository = hotelRepository;
+        _cityRepository = cityRepository;
+    }
+
+    public async Task<ServiceResult<IEnumerable<HotelDto>>> GetAllHotelsAsync()
+    {
+        try
+        {
+            var hotelDtos = await _hotelRepository.GetHotelsWithDetails()
+                .ProjectToHotelDto()
+                .ToListAsync();
+
+            return ServiceResult<IEnumerable<HotelDto>>.Success(hotelDtos, "Oteller başarıyla getirildi.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<IEnumerable<HotelDto>>.Failure($"Oteller getirilirken hata oluştu: {ex.Message}");
+        }
+    }
+
+    public async Task<ServiceResult<HotelDto>> GetHotelByIdAsync(int id)
+    {
+        try
+        {
+            var hotelDto = await _hotelRepository.GetHotelsWithDetails()
+                .Where(h => h.Id == id)
+                .ProjectToHotelDto()
+                .FirstOrDefaultAsync();
+
+            if (hotelDto == null)
+            {
+                return ServiceResult<HotelDto>.Failure("Otel bulunamadı.");
+            }
+
+            return ServiceResult<HotelDto>.Success(hotelDto, "Otel başarıyla getirildi.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<HotelDto>.Failure($"Otel getirilirken hata oluştu: {ex.Message}");
+        }
+    }
+
+    public async Task<ServiceResult<IEnumerable<HotelDto>>> GetHotelsByCityAsync(int cityId)
+    {
+        try
+        {
+            var hotelDtos = await _hotelRepository.GetHotelsByCity(cityId)
+                .ProjectToHotelDto()
+                .ToListAsync();
+
+            return ServiceResult<IEnumerable<HotelDto>>.Success(hotelDtos, "Şehirdeki oteller başarıyla getirildi.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<IEnumerable<HotelDto>>.Failure($"Şehirdeki oteller getirilirken hata oluştu: {ex.Message}");
+        }
+    }
+
+    public async Task<ServiceResult<HotelDto>> CreateHotelAsync(HotelCreateDto hotelDto)
+    {
+        try
+        {
+            // Şehir var mı kontrol et
+            var cityExists = await _cityRepository.ExistsAsync(hotelDto.CityId);
+            if (!cityExists)
+            {
+                return ServiceResult<HotelDto>.Failure("Belirtilen şehir bulunamadı.");
+            }
+
+            var hotel = new Hotel
+            {
+                Name = hotelDto.Name,
+                Yildiz = hotelDto.Yildiz,
+                CityId = hotelDto.CityId,
+                CreatedDate = DateTime.UtcNow
+            };
+
+            var createdHotel = await _hotelRepository.AddAsync(hotel);
+
+            // Projection ile detaylı bilgiyi al
+            var resultDto = await _hotelRepository.GetHotelsWithDetails()
+                .Where(h => h.Id == createdHotel.Id)
+                .ProjectToHotelDto()
+                .FirstAsync();
+
+            return ServiceResult<HotelDto>.Success(resultDto, "Otel başarıyla oluşturuldu.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<HotelDto>.Failure($"Otel oluşturulurken hata oluştu: {ex.Message}");
+        }
+    }
+
+    public async Task<ServiceResult<HotelDto>> UpdateHotelAsync(int id, HotelCreateDto hotelDto)
+    {
+        try
+        {
+            var existingHotel = await _hotelRepository.GetByIdAsync(id);
+            if (existingHotel == null)
+            {
+                return ServiceResult<HotelDto>.Failure("Güncellenecek otel bulunamadı.");
+            }
+
+            // Şehir var mı kontrol et
+            var cityExists = await _cityRepository.ExistsAsync(hotelDto.CityId);
+            if (!cityExists)
+            {
+                return ServiceResult<HotelDto>.Failure("Belirtilen şehir bulunamadı.");
+            }
+
+            existingHotel.Name = hotelDto.Name;
+            existingHotel.Yildiz = hotelDto.Yildiz;
+            existingHotel.CityId = hotelDto.CityId;
+
+            await _hotelRepository.UpdateAsync(existingHotel);
+
+            // Projection ile güncellenmiş veriyi al
+            var resultDto = await _hotelRepository.GetHotelsWithDetails()
+                .Where(h => h.Id == id)
+                .ProjectToHotelDto()
+                .FirstAsync();
+
+            return ServiceResult<HotelDto>.Success(resultDto, "Otel başarıyla güncellendi.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult<HotelDto>.Failure($"Otel güncellenirken hata oluştu: {ex.Message}");
+        }
+    }
+
+    public async Task<ServiceResult> DeleteHotelAsync(int id)
+    {
+        try
+        {
+            var exists = await _hotelRepository.ExistsAsync(id);
+            if (!exists)
+            {
+                return ServiceResult.Failure("Silinecek otel bulunamadı.");
+            }
+
+            var deleted = await _hotelRepository.DeleteAsync(id);
+            if (!deleted)
+            {
+                return ServiceResult.Failure("Otel silinirken hata oluştu.");
+            }
+
+            return ServiceResult.Success("Otel başarıyla silindi.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResult.Failure($"Otel silinirken hata oluştu: {ex.Message}");
+        }
+    }
+}

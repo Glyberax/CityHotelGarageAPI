@@ -15,9 +15,9 @@ public class BaseRepository<T> : IBaseRepository<T> where T : class
         _dbSet = context.Set<T>();
     }
 
-    public virtual async Task<IEnumerable<T>> GetAllAsync()
+    public virtual IQueryable<T> GetAll()   
     {
-        return await _dbSet.ToListAsync();
+        return _dbSet.AsQueryable();
     }
 
     public virtual async Task<T?> GetByIdAsync(int id)

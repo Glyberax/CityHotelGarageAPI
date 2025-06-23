@@ -2,7 +2,7 @@ namespace CityHotelGarageAPI.Repository.Interfaces;
 
 public interface IBaseRepository<T> where T : class
 {
-    Task<IEnumerable<T>> GetAllAsync();
+    IQueryable<T> GetAll();
     Task<T?> GetByIdAsync(int id);
     Task<T> AddAsync(T entity);
     Task<T> UpdateAsync(T entity);

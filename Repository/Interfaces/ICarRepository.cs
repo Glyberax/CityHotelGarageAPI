@@ -4,9 +4,9 @@ namespace CityHotelGarageAPI.Repository.Interfaces;
 
 public interface ICarRepository : IBaseRepository<Car>
 {
-    Task<IEnumerable<Car>> GetCarsWithDetailsAsync();
+    IQueryable<Car> GetCarsWithDetails();
     Task<Car?> GetCarWithDetailsAsync(int id);
     Task<Car?> GetCarByLicensePlateAsync(string licensePlate);
-    Task<IEnumerable<Car>> GetCarsByGarageAsync(int garageId);
+    IQueryable<Car> GetCarsByGarage(int garageId);
     Task<bool> IsLicensePlateExistsAsync(string licensePlate);
 }

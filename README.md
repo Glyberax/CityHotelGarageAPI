@@ -237,9 +237,6 @@ POST /api/Cities
 4. Branch'i push edin (`git push origin feature/AmazingFeature`)
 5. Pull Request oluşturun
 
-## 📝 License
-
-Bu proje MIT lisansı altında lisanslanmıştır.
 
 ## 📞 İletişim
 
@@ -248,4 +245,4 @@ Bu proje MIT lisansı altında lisanslanmıştır.
 
 ---
 
-⭐ Bu projeyi beğendiyseniz yıldız vermeyi unutmayın!
+⭐ Bu projeyi beğendiyseniz yıldız vermeyi unutmayın

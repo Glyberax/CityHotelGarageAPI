@@ -121,11 +121,11 @@ using (var scope = app.Services.CreateScope())
         // Demo verileri ekle
         await SeedData(context);
         
-        Console.WriteLine("🗄️ Veritabanı başarıyla hazırlandı!");
+        Console.WriteLine("Veritabanı başarıyla hazırlandı!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Veritabanı hatası: {ex.Message}");
+        Console.WriteLine($"Veritabanı hatası: {ex.Message}");
     }
 }
 

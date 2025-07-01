@@ -22,17 +22,12 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // FluentValidation Configuration
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddFluentValidationClientsideAdapters();
+// builder.Services.AddFluentValidationAutoValidation();
+// builder.Services.AddFluentValidationClientsideAdapters();
 
-// Validator'ları kaydetme
-builder.Services.AddScoped<IValidator<Car>, CarValidator>();
 builder.Services.AddScoped<IValidator<CarCreateDto>, CarCreateDtoValidator>();
-builder.Services.AddScoped<IValidator<City>, CityValidator>();
 builder.Services.AddScoped<IValidator<CityCreateDto>, CityCreateDtoValidator>();
-builder.Services.AddScoped<IValidator<Hotel>, HotelValidator>();
 builder.Services.AddScoped<IValidator<HotelCreateDto>, HotelCreateDtoValidator>();
-builder.Services.AddScoped<IValidator<Garage>, GarageValidator>();
 builder.Services.AddScoped<IValidator<GarageCreateDto>, GarageCreateDtoValidator>();
 
 // AutoMapper Configuration

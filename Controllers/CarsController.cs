@@ -79,7 +79,7 @@ public class CarsController : ControllerBase
     }
 
     // PUT: api/Cars/5
-    [HttpPut("{id}")]
+    [HttpPut("[action]/{id}")]
     public async Task<ActionResult> PutCar(int id, CarCreateDto carDto)
     {
         if (!ModelState.IsValid)

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using CityHotelGarage.Business.Repository.Data;
-using CityHotelGarage.Business.Repository.Models;
+using CityHotelGarage.Business.Operations.DTOs;
+using CityHotelGarage.Business.Operations.Interfaces;
 
 namespace CityHotelGarageAPI.API.Controllers;
 
@@ -9,148 +8,96 @@ namespace CityHotelGarageAPI.API.Controllers;
 [Route("api/[controller]")]
 public class GaragesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IGarageService _garageService;
 
-    public GaragesController(AppDbContext context)
+    public GaragesController(IGarageService garageService)
     {
-        _context = context;
+        _garageService = garageService;
     }
 
     // GET: api/Garages
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<object>>> GetGarages()
+    public async Task<ActionResult> GetGarages()
     {
-        var garages = await _context.Garages
-            .Include(g => g.Hotel)
-            .ThenInclude(h => h.City)
-            .Include(g => g.Cars)
-            .Select(g => new
-            {
-                g.Id,
-                g.Name,
-                g.Capacity,
-                g.CreatedDate,
-                HotelName = g.Hotel.Name,
-                CityName = g.Hotel.City.Name,
-                g.HotelId,
-                CarCount = g.Cars.Count(),
-                AvailableSpaces = g.Capacity - g.Cars.Count()
-            })
-            .ToListAsync();
+        var result = await _garageService.GetAllGaragesAsync();
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Message, errors = result.Errors });
+        }
 
-        return Ok(garages);
+        return Ok(new { message = result.Message, data = result.Data });
     }
 
     // GET: api/Garages/5
     [HttpGet("{id}")]
-    public async Task<ActionResult<object>> GetGarage(int id)
+    public async Task<ActionResult> GetGarage(int id)
     {
-        var garage = await _context.Garages
-            .Include(g => g.Hotel)
-            .ThenInclude(h => h.City)
-            .Include(g => g.Cars)
-            .Where(g => g.Id == id)
-            .Select(g => new
-            {
-                g.Id,
-                g.Name,
-                g.Capacity,
-                g.CreatedDate,
-                Hotel = new { g.Hotel.Id, g.Hotel.Name },
-                City = new { g.Hotel.City.Id, g.Hotel.City.Name },
-                Cars = g.Cars.Select(c => new
-                {
-                    c.Id,
-                    c.Brand,
-                    c.LicensePlate,
-                    c.OwnerName,
-                    c.EntryTime
-                }),
-                CarCount = g.Cars.Count(),
-                AvailableSpaces = g.Capacity - g.Cars.Count()
-            })
-            .FirstOrDefaultAsync();
-
-        if (garage == null)
+        var result = await _garageService.GetGarageByIdAsync(id);
+        
+        if (!result.IsSuccess)
         {
-            return NotFound();
+            return NotFound(new { message = result.Message, errors = result.Errors });
         }
 
-        return Ok(garage);
+        return Ok(new { message = result.Message, data = result.Data });
+    }
+
+    // GET: api/Garages/ByHotel/{hotelId}
+    [HttpGet("ByHotel/{hotelId}")]
+    public async Task<ActionResult> GetGaragesByHotel(int hotelId)
+    {
+        var result = await _garageService.GetGaragesByHotelAsync(hotelId);
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Message, errors = result.Errors });
+        }
+
+        return Ok(new { message = result.Message, data = result.Data });
     }
 
     // POST: api/Garages
     [HttpPost]
-    public async Task<ActionResult<Garage>> PostGarage(Garage garage)
+    public async Task<ActionResult> CreateGarage(GarageCreateDto garageDto)
     {
-        // Otel var mı kontrol et
-        var hotelExists = await _context.Hotels.AnyAsync(h => h.Id == garage.HotelId);
-        if (!hotelExists)
+        var result = await _garageService.CreateGarageAsync(garageDto);
+        
+        if (!result.IsSuccess)
         {
-            return BadRequest("Belirtilen otel bulunamadı.");
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        _context.Garages.Add(garage);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction("GetGarage", new { id = garage.Id }, garage);
+        return CreatedAtAction(nameof(GetGarage), 
+            new { id = result.Data!.Id }, 
+            new { message = result.Message, data = result.Data });
     }
 
     // PUT: api/Garages/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutGarage(int id, Garage garage)
+    public async Task<ActionResult> UpdateGarage(int id, GarageUpdateDto garageDto)
     {
-        if (id != garage.Id)
+        var result = await _garageService.UpdateGarageAsync(id, garageDto);
+        
+        if (!result.IsSuccess)
         {
-            return BadRequest();
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        // Otel var mı kontrol et
-        var hotelExists = await _context.Hotels.AnyAsync(h => h.Id == garage.HotelId);
-        if (!hotelExists)
-        {
-            return BadRequest("Belirtilen otel bulunamadı.");
-        }
-
-        _context.Entry(garage).State = EntityState.Modified;
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!GarageExists(id))
-            {
-                return NotFound();
-            }
-            else
-            {
-                throw;
-            }
-        }
-
-        return NoContent();
+        return Ok(new { message = result.Message, data = result.Data });
     }
 
     // DELETE: api/Garages/5
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteGarage(int id)
+    public async Task<ActionResult> DeleteGarage(int id)
     {
-        var garage = await _context.Garages.FindAsync(id);
-        if (garage == null)
+        var result = await _garageService.DeleteGarageAsync(id);
+        
+        if (!result.IsSuccess)
         {
-            return NotFound();
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        _context.Garages.Remove(garage);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
-
-    private bool GarageExists(int id)
-    {
-        return _context.Garages.Any(e => e.Id == id);
+        return Ok(new { message = result.Message });
     }
 }

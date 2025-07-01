@@ -18,22 +18,39 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "City Hotel Garage API",
+        Version = "v1",
+        Description = "Şehir, Otel, Garaj ve Araba yönetim sistemi - Async FluentValidation ile",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "Development Team",
+            Email = "dev@example.com"
+        }
+    });
 });
 
-// FluentValidation Configuration
-// builder.Services.AddFluentValidationAutoValidation();
-// builder.Services.AddFluentValidationClientsideAdapters();
-
+// FluentValidation Configuration - ASYNC Validators
+// CREATE Validators
 builder.Services.AddScoped<IValidator<CarCreateDto>, CarCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<CityCreateDto>, CityCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<HotelCreateDto>, HotelCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<GarageCreateDto>, GarageCreateDtoValidator>();
 
-// AutoMapper Configuration
+// UPDATE Validators - YENİ EKLENENLER! ✅
+builder.Services.AddScoped<IValidator<CarUpdateDto>, CarUpdateDtoValidator>();
+builder.Services.AddScoped<IValidator<CityUpdateDto>, CityUpdateDtoValidator>();
+builder.Services.AddScoped<IValidator<HotelUpdateDto>, HotelUpdateDtoValidator>();
+builder.Services.AddScoped<IValidator<GarageUpdateDto>, GarageUpdateDtoValidator>();
+
+// AutoMapper Configuration - Optimized
 builder.Services.AddSingleton(provider => new MapperConfiguration(cfg =>
 {
     cfg.AddProfile<AutoMapperProfile>();
+    // Performance optimization
+    cfg.AllowNullCollections = true;
+    cfg.AllowNullDestinationValues = true;
 }).CreateMapper());
 
 // Repository Pattern - Dependency Injection
@@ -42,13 +59,13 @@ builder.Services.AddScoped<IHotelRepository, HotelRepository>();
 builder.Services.AddScoped<IGarageRepository, GarageRepository>();
 builder.Services.AddScoped<ICarRepository, CarRepository>();
 
-// Service Pattern - Dependency Injection
+// Service Pattern - Dependency Injection - TÜM SERVİSLER ✅
 builder.Services.AddScoped<ICityService, CityService>();
 builder.Services.AddScoped<IHotelService, HotelService>();
 builder.Services.AddScoped<IGarageService, GarageService>();
 builder.Services.AddScoped<ICarService, CarService>();
 
-// Entity Framework DbContext
+// Entity Framework DbContext - Enhanced Configuration
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql("Host=localhost;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512");
@@ -56,8 +73,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     if (builder.Environment.IsDevelopment())
     {
         options.EnableSensitiveDataLogging();
-        options.LogTo(Console.WriteLine);
+        options.EnableDetailedErrors();
+        options.LogTo(Console.WriteLine, LogLevel.Information);
     }
+    
+    // Performance optimizations
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+    options.EnableServiceProviderCaching();
+    options.EnableSensitiveDataLogging(builder.Environment.IsDevelopment());
 });
 
 // CORS Configuration - Frontend bağlantısı için
@@ -69,13 +92,27 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
+    
+    // Production için daha güvenli CORS policy
+    options.AddPolicy("Production", policy =>
+    {
+        policy.WithOrigins("https://localhost:3000", "https://yourdomain.com")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
 });
 
-// JSON Serializer ayarları
+// JSON Serializer ayarları - Enhanced
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = null; // PascalCase korur
+    options.SerializerOptions.WriteIndented = builder.Environment.IsDevelopment();
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
 });
+
+// Health Checks
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
@@ -86,8 +123,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "City Hotel Garage API v1");
-        c.RoutePrefix = string.Empty; 
+        c.RoutePrefix = string.Empty; // Swagger UI'ı root'ta aç
         c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+        c.DefaultModelsExpandDepth(-1); // Model şemalarını gizle
+        c.DisplayRequestDuration();
     });
     
     app.UseDeveloperExceptionPage();
@@ -99,75 +138,131 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors(app.Environment.IsDevelopment() ? "AllowAll" : "Production");
 app.UseAuthorization();
+
+// Health check endpoint
+app.MapHealthChecks("/health");
+
 app.MapControllers();
 
-// Database initialization ve seeding
+// Database initialization ve seeding - Enhanced Error Handling
 using (var scope = app.Services.CreateScope())
 {
     try
     {
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         
-        // Database oluştur
+        Console.WriteLine("🔄 Veritabanı bağlantısı kontrol ediliyor...");
+        
+        // Database oluştur ve migrate et
         await context.Database.EnsureCreatedAsync();
+        
+        Console.WriteLine("✅ Veritabanı bağlantısı başarılı!");
         
         // Demo verileri ekle
         await SeedData(context);
         
-        Console.WriteLine("Veritabanı başarıyla hazırlandı!");
+        Console.WriteLine("🎯 Veritabanı hazır!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Veritabanı hatası: {ex.Message}");
+        Console.WriteLine($"❌ Veritabanı hatası: {ex.Message}");
+        Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+        
+        // Development'ta hatayı göster, production'da logla
+        if (app.Environment.IsDevelopment())
+        {
+            throw; // Development'ta crash yap
+        }
+        else
+        {
+            // Production'da loglama servisi kullanılabilir
+            Console.WriteLine("Production modunda çalışmaya devam ediliyor...");
+        }
     }
 }
 
-Console.WriteLine("City Hotel Garage API başlatılıyor...");
-Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine("Swagger UI: http://localhost:5010");
-Console.WriteLine("API Base: http://localhost:5010/api");
+// Application startup messages
+Console.WriteLine("🚀 City Hotel Garage API başlatılıyor...");
+Console.WriteLine($"🔧 Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"📊 Swagger UI: https://localhost:5001");
+Console.WriteLine($"🌐 API Base: https://localhost:5001/api");
+Console.WriteLine($"❤️  Health Check: https://localhost:5001/health");
+Console.WriteLine("📝 Available Endpoints:");
+Console.WriteLine("   - GET  /api/Cities");
+Console.WriteLine("   - GET  /api/Hotels");
+Console.WriteLine("   - GET  /api/Garages");
+Console.WriteLine("   - GET  /api/Cars");
+Console.WriteLine("   - POST /api/Cars (Create new car)");
+Console.WriteLine("   - PUT  /api/Cars/{id} (Update car)");
+Console.WriteLine("   - DELETE /api/Cars/{id} (Remove car)");
 
 app.Run();
 
-// Demo veri ekleme metodu
+// Demo veri ekleme metodu - Enhanced
 static async Task SeedData(AppDbContext context)
 {
     if (context.Cities.Any()) 
     {
-        Console.WriteLine("📊 Demo veriler zaten mevcut.");
+        Console.WriteLine("📊 Demo veriler zaten mevcut, seeding atlanıyor.");
         return;
     }
 
     Console.WriteLine("🌱 Demo verileri ekleniyor...");
 
-    // Şehirler
-    var istanbul = new City { Name = "İstanbul", Population = 15500000 };
-    var ankara = new City { Name = "Ankara", Population = 5500000 };
-    context.Cities.AddRange(istanbul, ankara);
-    await context.SaveChangesAsync();
+    try
+    {
+        // Şehirler
+        var istanbul = new City { Name = "İstanbul", Population = 15500000 };
+        var ankara = new City { Name = "Ankara", Population = 5500000 };
+        var izmir = new City { Name = "İzmir", Population = 4500000 };
+        
+        context.Cities.AddRange(istanbul, ankara, izmir);
+        await context.SaveChangesAsync();
+        Console.WriteLine("   ✅ Şehirler eklendi");
 
-    // Oteller
-    var hotel1 = new Hotel { Name = "Grand Hotel", Yildiz = 5, CityId = istanbul.Id };
-    var hotel2 = new Hotel { Name = "City Hotel", Yildiz = 4, CityId = istanbul.Id };
-    var hotel3 = new Hotel { Name = "Ankara Palace", Yildiz = 4, CityId = ankara.Id };
-    context.Hotels.AddRange(hotel1, hotel2, hotel3);
-    await context.SaveChangesAsync();
+        // Oteller
+        var hotel1 = new Hotel { Name = "Grand Hotel", Yildiz = 5, CityId = istanbul.Id };
+        var hotel2 = new Hotel { Name = "City Hotel", Yildiz = 4, CityId = istanbul.Id };
+        var hotel3 = new Hotel { Name = "Ankara Palace", Yildiz = 4, CityId = ankara.Id };
+        var hotel4 = new Hotel { Name = "İzmir Resort", Yildiz = 3, CityId = izmir.Id };
+        
+        context.Hotels.AddRange(hotel1, hotel2, hotel3, hotel4);
+        await context.SaveChangesAsync();
+        Console.WriteLine("   ✅ Oteller eklendi");
 
-    // Garajlar
-    var garage1 = new Garage { Name = "Ana Garaj", Capacity = 50, HotelId = hotel1.Id };
-    var garage2 = new Garage { Name = "Yan Garaj", Capacity = 30, HotelId = hotel1.Id };
-    var garage3 = new Garage { Name = "VIP Garaj", Capacity = 20, HotelId = hotel2.Id };
-    context.Garages.AddRange(garage1, garage2, garage3);
-    await context.SaveChangesAsync();
+        // Garajlar
+        var garage1 = new Garage { Name = "Ana Garaj", Capacity = 50, HotelId = hotel1.Id };
+        var garage2 = new Garage { Name = "Yan Garaj", Capacity = 30, HotelId = hotel1.Id };
+        var garage3 = new Garage { Name = "VIP Garaj", Capacity = 20, HotelId = hotel2.Id };
 
-    // Arabalar
-    var car1 = new Car { Brand = "BMW", LicensePlate = "34ABC123", OwnerName = "Ahmet Yılmaz", GarageId = garage1.Id };
-    var car2 = new Car { Brand = "Mercedes", LicensePlate = "34DEF456", OwnerName = "Ayşe Kaya", GarageId = garage1.Id };
-    var car3 = new Car { Brand = "Audi", LicensePlate = "06GHI789", OwnerName = "Mehmet Demir", GarageId = garage3.Id };
-    context.Cars.AddRange(car1, car2, car3);
-    await context.SaveChangesAsync();
+        
+        context.Garages.AddRange(garage1, garage2, garage3);
+        await context.SaveChangesAsync();
+        Console.WriteLine("   ✅ Garajlar eklendi");
 
-    Console.WriteLine("✅ Demo verileri eklendi!");
+        // Arabalar
+        var cars = new[]
+        {
+            new Car { Brand = "BMW", LicensePlate = "34ABC123", OwnerName = "Ahmet Yılmaz", GarageId = garage1.Id },
+            new Car { Brand = "Mercedes", LicensePlate = "34DEF456", OwnerName = "Ayşe Kaya", GarageId = garage1.Id },
+            new Car { Brand = "Audi", LicensePlate = "06GHI789", OwnerName = "Mehmet Demir", GarageId = garage3.Id }
+        };
+        
+        context.Cars.AddRange(cars);
+        await context.SaveChangesAsync();
+        Console.WriteLine("   ✅ Arabalar eklendi");
+
+        Console.WriteLine("🎉 Demo verileri başarıyla eklendi!");
+        Console.WriteLine($"   📊 {context.Cities.Count()} şehir");
+        Console.WriteLine($"   🏨 {context.Hotels.Count()} otel");
+        Console.WriteLine($"   🅿️  {context.Garages.Count()} garaj");
+        Console.WriteLine($"   🚗 {context.Cars.Count()} araba");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Demo veri ekleme hatası: {ex.Message}");
+        throw;
+    }
 }

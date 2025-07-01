@@ -57,16 +57,25 @@ public class CarsController : ControllerBase
         return Ok(new { message = result.Message, data = result.Data });
     }
 
-    // POST: api/Cars (Yeni araba park et)
-    [HttpPost]
-    public async Task<ActionResult> PostCar(CarCreateDto carDto)
+    // GET: api/Cars/ByGarage/{garageId}
+    [HttpGet("ByGarage/{garageId}")]
+    public async Task<ActionResult> GetCarsByGarage(int garageId)
     {
-        if (!ModelState.IsValid)
+        var result = await _carService.GetCarsByGarageAsync(garageId);
+        
+        if (!result.IsSuccess)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        var result = await _carService.ParkCarAsync(carDto);
+        return Ok(new { message = result.Message, data = result.Data });
+    }
+
+    // POST: api/Cars (Yeni araba park et)
+    [HttpPost]
+    public async Task<ActionResult> CreateCar(CarCreateDto carDto)
+    {
+        var result = await _carService.CreateCarAsync(carDto);
         
         if (!result.IsSuccess)
         {
@@ -79,14 +88,9 @@ public class CarsController : ControllerBase
     }
 
     // PUT: api/Cars/5
-    [HttpPut("[action]/{id}")]
-    public async Task<ActionResult> PutCar(int id, CarCreateDto carDto)
+    [HttpPut("{id}")]
+    public async Task<ActionResult> UpdateCar(int id, CarUpdateDto carDto)
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         var result = await _carService.UpdateCarAsync(id, carDto);
         
         if (!result.IsSuccess)
@@ -97,11 +101,11 @@ public class CarsController : ControllerBase
         return Ok(new { message = result.Message, data = result.Data });
     }
 
-    // DELETE: api/Cars/5 (Arabayı park yerinden çıkar)
+    // DELETE: api/Cars/5 (Arabayı garajdan çıkar)
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteCar(int id)
     {
-        var result = await _carService.RemoveCarAsync(id);
+        var result = await _carService.DeleteCarAsync(id);
         
         if (!result.IsSuccess)
         {
@@ -110,4 +114,4 @@ public class CarsController : ControllerBase
 
         return Ok(new { message = result.Message });
     }
-}// TODO: Add search functionality
+}

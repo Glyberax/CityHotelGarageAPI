@@ -45,13 +45,8 @@ public class CitiesController : ControllerBase
 
     // POST: api/Cities
     [HttpPost]
-    public async Task<ActionResult> PostCity(CityCreateDto cityDto)
+    public async Task<ActionResult> CreateCity(CityCreateDto cityDto)
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         var result = await _cityService.CreateCityAsync(cityDto);
         
         if (!result.IsSuccess)
@@ -66,13 +61,8 @@ public class CitiesController : ControllerBase
 
     // PUT: api/Cities/5
     [HttpPut("{id}")]
-    public async Task<ActionResult> PutCity(int id, CityCreateDto cityDto)
+    public async Task<ActionResult> UpdateCity(int id, CityUpdateDto cityDto)
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         var result = await _cityService.UpdateCityAsync(id, cityDto);
         
         if (!result.IsSuccess)

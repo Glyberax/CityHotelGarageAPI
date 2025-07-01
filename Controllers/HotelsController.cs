@@ -1,147 +1,103 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using CityHotelGarage.Business.Repository.Data;
-using CityHotelGarage.Business.Repository.Models;
+using CityHotelGarage.Business.Operations.DTOs;
+using CityHotelGarage.Business.Operations.Interfaces;
 
-namespace CityHotelGarage.Business.API.Controllers;
+namespace CityHotelGarageAPI.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class HotelsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IHotelService _hotelService;
 
-    public HotelsController(AppDbContext context)
+    public HotelsController(IHotelService hotelService)
     {
-        _context = context;
+        _hotelService = hotelService;
     }
 
     // GET: api/Hotels
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<object>>> GetHotels()
+    public async Task<ActionResult> GetHotels()
     {
-        var hotels = await _context.Hotels
-            .Include(h => h.City)
-            .Include(h => h.Garages)
-            .Select(h => new
-            {
-                h.Id,
-                h.Name,
-                h.Yildiz,
-                h.CreatedDate,
-                CityName = h.City.Name,
-                h.CityId,
-                GarageCount = h.Garages.Count()
-            })
-            .ToListAsync();
+        var result = await _hotelService.GetAllHotelsAsync();
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Message, errors = result.Errors });
+        }
 
-        return Ok(hotels);
+        return Ok(new { message = result.Message, data = result.Data });
     }
 
     // GET: api/Hotels/5
     [HttpGet("{id}")]
-    public async Task<ActionResult<object>> GetHotel(int id)
+    public async Task<ActionResult> GetHotel(int id)
     {
-        var hotel = await _context.Hotels
-            .Include(h => h.City)
-            .Include(h => h.Garages)
-            .Where(h => h.Id == id)
-            .Select(h => new
-            {
-                h.Id,
-                h.Name,
-                h.Yildiz,
-                h.CreatedDate,
-                City = new { h.City.Id, h.City.Name },
-                Garages = h.Garages.Select(g => new
-                {
-                    g.Id,
-                    g.Name,
-                    g.Capacity
-                })
-            })
-            .FirstOrDefaultAsync();
-
-        if (hotel == null)
+        var result = await _hotelService.GetHotelByIdAsync(id);
+        
+        if (!result.IsSuccess)
         {
-            return NotFound();
+            return NotFound(new { message = result.Message, errors = result.Errors });
         }
 
-        return Ok(hotel);
+        return Ok(new { message = result.Message, data = result.Data });
+    }
+
+    // GET: api/Hotels/ByCity/{cityId}
+    [HttpGet("ByCity/{cityId}")]
+    public async Task<ActionResult> GetHotelsByCity(int cityId)
+    {
+        var result = await _hotelService.GetHotelsByCityAsync(cityId);
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Message, errors = result.Errors });
+        }
+
+        return Ok(new { message = result.Message, data = result.Data });
     }
 
     // POST: api/Hotels
     [HttpPost]
-    public async Task<ActionResult<Hotel>> PostHotel(Hotel hotel)
+    public async Task<ActionResult> CreateHotel(HotelCreateDto hotelDto)
     {
-        // Şehir var mı kontrol et
-        var cityExists = await _context.Cities.AnyAsync(c => c.Id == hotel.CityId);
-        if (!cityExists)
+        var result = await _hotelService.CreateHotelAsync(hotelDto);
+        
+        if (!result.IsSuccess)
         {
-            return BadRequest("Belirtilen şehir bulunamadı.");
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        _context.Hotels.Add(hotel);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction("GetHotel", new { id = hotel.Id }, hotel);
+        return CreatedAtAction(nameof(GetHotel), 
+            new { id = result.Data!.Id }, 
+            new { message = result.Message, data = result.Data });
     }
 
     // PUT: api/Hotels/5
     [HttpPut("{id}")]
-    public async Task<IActionResult> PutHotel(int id, Hotel hotel)
+    public async Task<ActionResult> UpdateHotel(int id, HotelUpdateDto hotelDto)
     {
-        if (id != hotel.Id)
+        var result = await _hotelService.UpdateHotelAsync(id, hotelDto);
+        
+        if (!result.IsSuccess)
         {
-            return BadRequest();
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        // Şehir var mı kontrol
-        var cityExists = await _context.Cities.AnyAsync(c => c.Id == hotel.CityId);
-        if (!cityExists)
-        {
-            return BadRequest("Belirtilen şehir bulunamadı.");
-        }
-
-        _context.Entry(hotel).State = EntityState.Modified;
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!HotelExists(id))
-            {
-                return NotFound();
-            }
-            else
-            {
-                throw;
-            }
-        }
-
-        return NoContent();
+        return Ok(new { message = result.Message, data = result.Data });
     }
 
     // DELETE: api/Hotels/5
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteHotel(int id)
+    public async Task<ActionResult> DeleteHotel(int id)
     {
-        var hotel = await _context.Hotels.FindAsync(id);
-        if (hotel == null)
+        var result = await _hotelService.DeleteHotelAsync(id);
+        
+        if (!result.IsSuccess)
         {
-            return NotFound();
+            return BadRequest(new { message = result.Message, errors = result.Errors });
         }
 
-        _context.Hotels.Remove(hotel);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
-
-    private bool HotelExists(int id)
-    {
-        return _context.Hotels.Any(e => e.Id == id);
+        return Ok(new { message = result.Message });
     }
 }

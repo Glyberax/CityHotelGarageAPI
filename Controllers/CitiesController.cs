@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using CityHotelGarage.Business.Operations.DTOs;
 using CityHotelGarage.Business.Operations.Interfaces;
 
-namespace CityHotelGarageAPI.API.Controllers;
+namespace CityHotelGarageAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -45,13 +45,8 @@ public class CitiesController : ControllerBase
 
     // POST: api/Cities
     [HttpPost]
-    public async Task<ActionResult> PostCity(CityCreateDto cityDto)
+    public async Task<ActionResult> CreateCity(CityCreateDto cityDto) // ✅ Method ismi tutarlı
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         var result = await _cityService.CreateCityAsync(cityDto);
         
         if (!result.IsSuccess)
@@ -64,16 +59,12 @@ public class CitiesController : ControllerBase
             new { message = result.Message, data = result.Data });
     }
 
-    // PUT: api/Cities/5
-    [HttpPut("{id}")]
-    public async Task<ActionResult> PutCity(int id, CityCreateDto cityDto)
+    // PUT: api/Cities (Body'deki ID kullanılır)
+    [HttpPut]
+    public async Task<ActionResult> UpdateCity(CityUpdateDto cityDto) // ✅ CityUpdateDto + URL'den ID kaldırıldı
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        var result = await _cityService.UpdateCityAsync(id, cityDto);
+        // Body'deki ID'yi kullan
+        var result = await _cityService.UpdateCityAsync(cityDto.Id, cityDto);
         
         if (!result.IsSuccess)
         {
@@ -83,11 +74,11 @@ public class CitiesController : ControllerBase
         return Ok(new { message = result.Message, data = result.Data });
     }
 
-    // DELETE: api/Cities/5
-    [HttpDelete("{id}")]
-    public async Task<ActionResult> DeleteCity(int id)
+    // DELETE: api/Cities (Body'deki ID kullanılır)
+    [HttpDelete]
+    public async Task<ActionResult> DeleteCity(CityDeleteDto deleteDto)
     {
-        var result = await _cityService.DeleteCityAsync(id);
+        var result = await _cityService.DeleteCityAsync(deleteDto.Id);
         
         if (!result.IsSuccess)
         {

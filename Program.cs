@@ -18,27 +18,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-    {
-        Title = "City Hotel Garage API",
-        Version = "v1",
-        Description = "Şehir, Otel, Garaj ve Araba yönetim sistemi - Async FluentValidation ile",
-        Contact = new Microsoft.OpenApi.Models.OpenApiContact
-        {
-            Name = "Development Team",
-            Email = "dev@example.com"
-        }
+   
     });
-});
 
-// FluentValidation Configuration - ASYNC Validators
+
 // CREATE Validators
 builder.Services.AddScoped<IValidator<CarCreateDto>, CarCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<CityCreateDto>, CityCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<HotelCreateDto>, HotelCreateDtoValidator>();
 builder.Services.AddScoped<IValidator<GarageCreateDto>, GarageCreateDtoValidator>();
 
-// UPDATE Validators - YENİ EKLENENLER! ✅
+// UPDATE Validators 
 builder.Services.AddScoped<IValidator<CarUpdateDto>, CarUpdateDtoValidator>();
 builder.Services.AddScoped<IValidator<CityUpdateDto>, CityUpdateDtoValidator>();
 builder.Services.AddScoped<IValidator<HotelUpdateDto>, HotelUpdateDtoValidator>();
@@ -48,7 +38,6 @@ builder.Services.AddScoped<IValidator<GarageUpdateDto>, GarageUpdateDtoValidator
 builder.Services.AddSingleton(provider => new MapperConfiguration(cfg =>
 {
     cfg.AddProfile<AutoMapperProfile>();
-    // Performance optimization
     cfg.AllowNullCollections = true;
     cfg.AllowNullDestinationValues = true;
 }).CreateMapper());
@@ -59,7 +48,7 @@ builder.Services.AddScoped<IHotelRepository, HotelRepository>();
 builder.Services.AddScoped<IGarageRepository, GarageRepository>();
 builder.Services.AddScoped<ICarRepository, CarRepository>();
 
-// Service Pattern - Dependency Injection - TÜM SERVİSLER ✅
+// Service Pattern - Dependency Injection
 builder.Services.AddScoped<ICityService, CityService>();
 builder.Services.AddScoped<IHotelService, HotelService>();
 builder.Services.AddScoped<IGarageService, GarageService>();
@@ -96,7 +85,7 @@ builder.Services.AddCors(options =>
     // Production için daha güvenli CORS policy
     options.AddPolicy("Production", policy =>
     {
-        policy.WithOrigins("https://localhost:3000", "https://yourdomain.com")
+        policy.WithOrigins("https://localhost:3000")
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -123,9 +112,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "City Hotel Garage API v1");
-        c.RoutePrefix = string.Empty; // Swagger UI'ı root'ta aç
+        c.RoutePrefix = string.Empty;
         c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
-        c.DefaultModelsExpandDepth(-1); // Model şemalarını gizle
+        c.DefaultModelsExpandDepth(-1);
         c.DisplayRequestDuration();
     });
     
@@ -153,21 +142,21 @@ using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         
-        Console.WriteLine("🔄 Veritabanı bağlantısı kontrol ediliyor...");
+        Console.WriteLine("Veritabanı bağlantısı kontrol ediliyor...");
         
         // Database oluştur ve migrate et
         await context.Database.EnsureCreatedAsync();
         
-        Console.WriteLine("✅ Veritabanı bağlantısı başarılı!");
+        Console.WriteLine("Veritabanı bağlantısı başarılı!");
         
         // Demo verileri ekle
         await SeedData(context);
         
-        Console.WriteLine("🎯 Veritabanı hazır!");
+        Console.WriteLine("Veritabanı hazır!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Veritabanı hatası: {ex.Message}");
+        Console.WriteLine($"Veritabanı hatası: {ex.Message}");
         Console.WriteLine($"Stack Trace: {ex.StackTrace}");
         
         // Development'ta hatayı göster, production'da logla
@@ -184,12 +173,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Application startup messages
-Console.WriteLine("🚀 City Hotel Garage API başlatılıyor...");
-Console.WriteLine($"🔧 Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine($"📊 Swagger UI: https://localhost:5001");
-Console.WriteLine($"🌐 API Base: https://localhost:5001/api");
-Console.WriteLine($"❤️  Health Check: https://localhost:5001/health");
-Console.WriteLine("📝 Available Endpoints:");
+Console.WriteLine("City Hotel Garage API başlatılıyor...");
 Console.WriteLine("   - GET  /api/Cities");
 Console.WriteLine("   - GET  /api/Hotels");
 Console.WriteLine("   - GET  /api/Garages");
@@ -200,12 +184,12 @@ Console.WriteLine("   - DELETE /api/Cars/{id} (Remove car)");
 
 app.Run();
 
-// Demo veri ekleme metodu - Enhanced
+// Demo veri ekleme metodu
 static async Task SeedData(AppDbContext context)
 {
     if (context.Cities.Any()) 
     {
-        Console.WriteLine("📊 Demo veriler zaten mevcut, seeding atlanıyor.");
+        Console.WriteLine("Demo veriler zaten mevcut, seeding atlanıyor.");
         return;
     }
 

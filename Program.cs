@@ -10,8 +10,6 @@ using CityHotelGarage.Business.Operations.DTOs;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
 using FluentValidation;
-using FluentValidation.AspNetCore;
-// ✅ JWT Bearer Token için eklenen using'ler
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
@@ -19,8 +17,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Controllers ve API Explorer
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Swagger Configuration with JWT Support
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -28,14 +29,19 @@ builder.Services.AddSwaggerGen(options =>
         Title = "City Hotel Garage API",
         Version = "v1",
         Description = "Şehir, Otel, Garaj ve Araba yönetim sistemi - JWT Bearer Token ile güvenlik",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "City Hotel Garage Team",
+            Email = "info@cityhotelgarage.com"
+        }
     });
 
-    // ✅ Swagger'da JWT Bearer Token desteği
+    // JWT Bearer Token desteği
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = @"JWT Authorization header using the Bearer scheme. 
                       Enter 'Bearer' [space] and then your token in the text input below.
-                      Example: 'Bearer 12345abcdef'",
+                      Example: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'",
         Name = "Authorization",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
@@ -61,50 +67,63 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// ✅ JWT Configuration - Docker Environment Variables desteği ile
+// JWT Configuration - Environment Variables ile
 var jwtSecretKey = Environment.GetEnvironmentVariable("JWT__SecretKey") 
-                   ?? "CityHotelGarageSecretKey2024!@#VerySecureKey123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+                   ?? "MyVerySecureSecretKey2024ForCityHotelGarageAPI!";
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer") ?? "CityHotelGarageAPI";
 var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience") ?? "CityHotelGarageUsers";
-var jwtExpiryMinutes = Environment.GetEnvironmentVariable("JWT__ExpiryMinutes") ?? "10080"; // 7 gün
+var jwtExpiryMinutes = int.Parse(Environment.GetEnvironmentVariable("JWT__ExpiryMinutes") ?? "60");
 
+// JWT Debug Info
 Console.WriteLine($"🔐 JWT Configuration:");
 Console.WriteLine($"   Issuer: {jwtIssuer}");
 Console.WriteLine($"   Audience: {jwtAudience}");
 Console.WriteLine($"   Expiry: {jwtExpiryMinutes} minutes");
+Console.WriteLine($"   SecretKey Length: {jwtSecretKey.Length} characters");
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+// JWT Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtSecretKey)),
-            ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
-            ValidateAudience = true,
-            ValidAudience = jwtAudience,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero // Token süresinde tolerans yok
-        };
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+        ClockSkew = TimeSpan.Zero
+    };
 
-        // Bearer token events
-        options.Events = new JwtBearerEvents
+    // Event handlers for debugging
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
         {
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine($"❌ Bearer Token Authentication failed: {context.Exception.Message}");
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine($"✅ Bearer Token validated for user: {context.Principal?.Identity?.Name}");
-                return Task.CompletedTask;
-            }
-        };
-    });
+            Console.WriteLine($"🚫 JWT Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine("✅ JWT Token validated successfully");
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            Console.WriteLine($"🔍 JWT Challenge: {context.Error} - {context.ErrorDescription}");
+            return Task.CompletedTask;
+        }
+    };
+});
 
-// ✅ Authorization Policies
+// Authorization Policies
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
@@ -112,33 +131,15 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 });
 
-// ✅ JWT Configuration - Docker environment variables ile
-builder.Configuration.AddInMemoryCollection(new Dictionary<string, string>
+// JWT Configuration for Dependency Injection
+builder.Services.Configure<JwtConfig>(options =>
 {
-    ["JWT:SecretKey"] = jwtSecretKey,
-    ["JWT:Issuer"] = jwtIssuer,
-    ["JWT:Audience"] = jwtAudience,
-    ["JWT:AccessTokenExpirationMinutes"] = jwtExpiryMinutes,
-    ["JWT:RefreshTokenExpirationDays"] = "30"
+    options.SecretKey = jwtSecretKey;
+    options.Issuer = jwtIssuer;
+    options.Audience = jwtAudience;
+    options.AccessTokenExpirationMinutes = jwtExpiryMinutes;
+    options.RefreshTokenExpirationDays = 30;
 });
-
-// FluentValidation Configuration - ASYNC Validators
-// CREATE Validators
-builder.Services.AddScoped<IValidator<CarCreateDto>, CarCreateDtoValidator>();
-builder.Services.AddScoped<IValidator<CityCreateDto>, CityCreateDtoValidator>();
-builder.Services.AddScoped<IValidator<HotelCreateDto>, HotelCreateDtoValidator>();
-builder.Services.AddScoped<IValidator<GarageCreateDto>, GarageCreateDtoValidator>();
-
-// UPDATE Validators
-builder.Services.AddScoped<IValidator<CarUpdateDto>, CarUpdateDtoValidator>();
-builder.Services.AddScoped<IValidator<CityUpdateDto>, CityUpdateDtoValidator>();
-builder.Services.AddScoped<IValidator<HotelUpdateDto>, HotelUpdateDtoValidator>();
-builder.Services.AddScoped<IValidator<GarageUpdateDto>, GarageUpdateDtoValidator>();
-
-// ✅ AUTH Validators - YENİ EKLENENLER
-builder.Services.AddScoped<IValidator<RegisterDto>, RegisterDtoValidator>();
-builder.Services.AddScoped<IValidator<LoginDto>, LoginDtoValidator>();
-builder.Services.AddScoped<IValidator<ChangePasswordDto>, ChangePasswordDtoValidator>();
 
 // AutoMapper Configuration
 builder.Services.AddSingleton(provider => new MapperConfiguration(cfg =>
@@ -153,7 +154,6 @@ builder.Services.AddScoped<ICityRepository, CityRepository>();
 builder.Services.AddScoped<IHotelRepository, HotelRepository>();
 builder.Services.AddScoped<IGarageRepository, GarageRepository>();
 builder.Services.AddScoped<ICarRepository, CarRepository>();
-// ✅ User Repository - YENİ EKLENEN
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // Service Pattern - Dependency Injection
@@ -161,17 +161,15 @@ builder.Services.AddScoped<ICityService, CityService>();
 builder.Services.AddScoped<IHotelService, HotelService>();
 builder.Services.AddScoped<IGarageService, GarageService>();
 builder.Services.AddScoped<ICarService, CarService>();
-// ✅ Auth Service ve JWT Service - YENİ EKLENENLER
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 
-// ✅ Password Hasher for User Authentication
+// Password Hasher for User Authentication
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// Entity Framework DbContext - Docker Configuration Enhanced
+// Entity Framework DbContext - Docker Configuration
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    // 🐳 Docker ortamında connection string'i environment variable'dan al
     var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
                            ?? builder.Configuration.GetConnectionString("DefaultConnection") 
                            ?? "Host=postgres;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512";
@@ -180,7 +178,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
-        // 🐳 Docker için retry policy
         npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(30),
@@ -199,22 +196,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.EnableServiceProviderCaching();
 });
 
-// CORS Configuration - Environment variables desteği ile
+// CORS Configuration
 var allowedOrigins = Environment.GetEnvironmentVariable("CORS__AllowedOrigins")?.Split(',')
-                    ?? new[] { "http://localhost:3000", "http://localhost:3001", "https://yourdomain.com" };
-
-Console.WriteLine($"🌐 CORS Allowed Origins: {string.Join(", ", allowedOrigins)}");
+                    ?? new[] { "http://localhost:3000", "http://localhost:5173", "http://localhost:8080" };
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-    
-    options.AddPolicy("DockerCorsPolicy", policy =>
+    options.AddPolicy("AllowSpecificOrigins", policy =>
     {
         policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
@@ -223,165 +211,120 @@ builder.Services.AddCors(options =>
     });
 });
 
-// JSON Serializer ayarları
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.PropertyNamingPolicy = null;
-    options.SerializerOptions.WriteIndented = builder.Environment.IsDevelopment();
-    options.SerializerOptions.PropertyNameCaseInsensitive = true;
-});
+// FluentValidation Configuration - Manuel validation için sadece DI
+// CREATE Validators
+builder.Services.AddScoped<IValidator<CarCreateDto>, CarCreateDtoValidator>();
+builder.Services.AddScoped<IValidator<CityCreateDto>, CityCreateDtoValidator>();
+builder.Services.AddScoped<IValidator<HotelCreateDto>, HotelCreateDtoValidator>();
+builder.Services.AddScoped<IValidator<GarageCreateDto>, GarageCreateDtoValidator>();
 
-// Health Checks - Enhanced for Docker
-builder.Services.AddHealthChecks()
-    .AddCheck("api", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("API is running"));
+// UPDATE Validators
+builder.Services.AddScoped<IValidator<CarUpdateDto>, CarUpdateDtoValidator>();
+builder.Services.AddScoped<IValidator<CityUpdateDto>, CityUpdateDtoValidator>();
+builder.Services.AddScoped<IValidator<HotelUpdateDto>, HotelUpdateDtoValidator>();
+builder.Services.AddScoped<IValidator<GarageUpdateDto>, GarageUpdateDtoValidator>();
 
+// AUTH Validators
+builder.Services.AddScoped<IValidator<RegisterDto>, RegisterDtoValidator>();
+builder.Services.AddScoped<IValidator<LoginDto>, LoginDtoValidator>();
+builder.Services.AddScoped<IValidator<ChangePasswordDto>, ChangePasswordDtoValidator>();
+
+// Health Checks
+builder.Services.AddHealthChecks();
+
+// Build the application
 var app = builder.Build();
 
-// Configure the HTTP request pipeline - Docker optimized
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "City Hotel Garage API v1");
-        c.RoutePrefix = string.Empty;
-        c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
-        c.DefaultModelsExpandDepth(-1);
-        c.DisplayRequestDuration();
-    });
-    
-    app.UseDeveloperExceptionPage();
-    app.UseCors("AllowAll");
-}
-else
-{
-    // 🐳 Production'da da Swagger'ı aç (Docker için)
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "City Hotel Garage API v1");
         c.RoutePrefix = "swagger";
+        c.DisplayRequestDuration();
+        c.EnableTryItOutByDefault();
     });
-    
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-    app.UseCors("DockerCorsPolicy");
 }
 
-app.UseHttpsRedirection();
-
-// ✅ Authentication & Authorization Middleware (SIRASI ÖNEMLİ!)
-app.UseAuthentication(); // Bearer token kontrolü
-app.UseAuthorization();  // Rol/Policy kontrolü
-
-// 🐳 Enhanced Health check endpoints for Docker
-app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+// Security Headers
+app.Use(async (context, next) =>
 {
-    ResponseWriter = async (context, report) =>
-    {
-        context.Response.ContentType = "application/json";
-        var response = new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(x => new
-            {
-                name = x.Key,
-                status = x.Value.Status.ToString(),
-                description = x.Value.Description,
-                duration = x.Value.Duration.TotalMilliseconds
-            }),
-            totalDuration = report.TotalDuration.TotalMilliseconds
-        };
-        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
-    }
+    context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Add("X-Frame-Options", "DENY");
+    context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+    await next();
 });
 
+// CORS
+app.UseCors("AllowSpecificOrigins");
+
+// Authentication & Authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Health Check endpoint - Database bağlantısı ile birlikte
+app.MapGet("/health", async (AppDbContext context) =>
+{
+    try
+    {
+        // Database bağlantısını test et
+        await context.Database.CanConnectAsync();
+        return Results.Ok(new { 
+            status = "Healthy", 
+            timestamp = DateTime.UtcNow,
+            database = "Connected",
+            environment = app.Environment.EnvironmentName,
+            version = "1.0.0"
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            detail: $"Database connection failed: {ex.Message}",
+            title : "Health Check Failed",
+            statusCode : 503
+        );
+    }
+}).WithTags("Health");
+
+// Controllers
 app.MapControllers();
 
-// 🐳 Database initialization ve seeding - Docker için güçlendirilmiş
+// Database Migration and Seeding - Enhanced with Demo Data
 using (var scope = app.Services.CreateScope())
 {
     try
     {
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         
-        Console.WriteLine("🐳 Docker ortamında veritabanı bağlantısı kontrol ediliyor...");
-        
-        // PostgreSQL'in hazır olmasını bekle - Enhanced retry logic
-        var maxRetries = 30; // 5 dakika bekle
-        var retryCount = 0;
-        
-        while (retryCount < maxRetries)
-        {
-            try
-            {
-                await context.Database.CanConnectAsync();
-                Console.WriteLine("✅ PostgreSQL bağlantısı başarılı!");
-                break;
-            }
-            catch (Exception ex)
-            {
-                retryCount++;
-                Console.WriteLine($"🔄 PostgreSQL bekleniyor... Deneme {retryCount}/{maxRetries} - {ex.Message}");
-                
-                if (retryCount >= maxRetries)
-                {
-                    Console.WriteLine("❌ PostgreSQL bağlantısı kurulamadı! Container'lar kontrol edin.");
-                    throw;
-                }
-                
-                await Task.Delay(10000); // 10 saniye bekle
-            }
-        }
-        
-        // Database oluştur ve migrate et
+        Console.WriteLine("🔄 Checking database connection...");
         await context.Database.EnsureCreatedAsync();
+        
+        Console.WriteLine("🚀 Database is ready!");
         
         // Demo verileri ekle
         await SeedData(context);
-        Console.WriteLine("🎯 Docker ortamında veritabanı hazır!");
+        
+        Console.WriteLine("🎯 Database ready with demo data!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Docker veritabanı hatası: {ex.Message}");
-        
-        if (app.Environment.IsDevelopment())
-        {
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-        }
-        
-        // Production'da crash yap
-        if (!app.Environment.IsDevelopment())
-        {
-            throw;
-        }
+        Console.WriteLine($"❌ Database setup error: {ex.Message}");
+        throw;
     }
 }
 
-// 🐳 Docker startup messages - Enhanced
-Console.WriteLine("=".PadRight(60, '='));
-Console.WriteLine("🐳 City Hotel Garage API Docker'da başlatılıyor...");
-Console.WriteLine($"🔧 Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine($"🌐 API Base: http://localhost:5010/api");
-Console.WriteLine($"📊 Swagger UI: http://localhost:5010/swagger");
+Console.WriteLine($"🌐 Application starting...");
+Console.WriteLine($"🏠 Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"📡 Listening on: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5010"}");
+Console.WriteLine($"📚 Swagger UI: http://localhost:5010/swagger");
 Console.WriteLine($"❤️  Health Check: http://localhost:5010/health");
-Console.WriteLine($"🐘 PostgreSQL: postgres:5432 (External: localhost:5433)");
-Console.WriteLine($"🔐 JWT Bearer Token: Enabled ({jwtExpiryMinutes} minutes expiry)");
-Console.WriteLine("👤 Auth Endpoints:");
-Console.WriteLine("   - POST /api/Auth/register");
-Console.WriteLine("   - POST /api/Auth/login");
-Console.WriteLine("   - POST /api/Auth/refresh-token");
-Console.WriteLine("   - POST /api/Auth/logout [Auth Required]");
-Console.WriteLine("   - GET  /api/Auth/profile [Auth Required]");
-Console.WriteLine("📋 Demo Accounts:");
-Console.WriteLine("   👤 admin / Admin123! (Admin)");
-Console.WriteLine("   👤 manager / Manager123! (Manager)");
-Console.WriteLine("   👤 testuser / User123! (User)");
-Console.WriteLine("=".PadRight(60, '='));
 
 app.Run();
 
-// Demo veri ekleme metodu - aynı kalacak
+// Demo veri ekleme metodu - Enhanced
 static async Task SeedData(AppDbContext context)
 {
     if (context.Cities.Any()) 
@@ -395,30 +338,30 @@ static async Task SeedData(AppDbContext context)
     try
     {
         // Şehirler
-        var istanbul = new City { Name = "İstanbul", Population = 15500000 };
-        var ankara = new City { Name = "Ankara", Population = 5500000 };
-        var izmir = new City { Name = "İzmir", Population = 4500000 };
+        var istanbul = new City { Name = "İstanbul", Population = 15500000, CreatedDate = DateTime.UtcNow };
+        var ankara = new City { Name = "Ankara", Population = 5500000, CreatedDate = DateTime.UtcNow };
+        var izmir = new City { Name = "İzmir", Population = 4500000, CreatedDate = DateTime.UtcNow };
         
         context.Cities.AddRange(istanbul, ankara, izmir);
         await context.SaveChangesAsync();
         Console.WriteLine("   ✅ Şehirler eklendi");
 
         // Oteller
-        var hotel1 = new Hotel { Name = "Grand Hotel", Yildiz = 5, CityId = istanbul.Id };
-        var hotel2 = new Hotel { Name = "City Hotel", Yildiz = 4, CityId = istanbul.Id };
-        var hotel3 = new Hotel { Name = "Ankara Palace", Yildiz = 4, CityId = ankara.Id };
-        var hotel4 = new Hotel { Name = "İzmir Resort", Yildiz = 3, CityId = izmir.Id };
+        var hotel1 = new Hotel { Name = "Grand Hotel", Yildiz = 5, CityId = istanbul.Id, CreatedDate = DateTime.UtcNow };
+        var hotel2 = new Hotel { Name = "City Hotel", Yildiz = 4, CityId = istanbul.Id, CreatedDate = DateTime.UtcNow };
+        var hotel3 = new Hotel { Name = "Ankara Palace", Yildiz = 4, CityId = ankara.Id, CreatedDate = DateTime.UtcNow };
+        var hotel4 = new Hotel { Name = "İzmir Resort", Yildiz = 3, CityId = izmir.Id, CreatedDate = DateTime.UtcNow };
         
         context.Hotels.AddRange(hotel1, hotel2, hotel3, hotel4);
         await context.SaveChangesAsync();
         Console.WriteLine("   ✅ Oteller eklendi");
 
         // Garajlar
-        var garage1 = new Garage { Name = "Ana Garaj", Capacity = 50, HotelId = hotel1.Id };
-        var garage2 = new Garage { Name = "Yan Garaj", Capacity = 30, HotelId = hotel1.Id };
-        var garage3 = new Garage { Name = "VIP Garaj", Capacity = 20, HotelId = hotel2.Id };
-        var garage4 = new Garage { Name = "Otopark A", Capacity = 40, HotelId = hotel3.Id };
-        var garage5 = new Garage { Name = "Açık Alan", Capacity = 60, HotelId = hotel4.Id };
+        var garage1 = new Garage { Name = "Ana Garaj", Capacity = 50, HotelId = hotel1.Id, CreatedDate = DateTime.UtcNow };
+        var garage2 = new Garage { Name = "Yan Garaj", Capacity = 30, HotelId = hotel1.Id, CreatedDate = DateTime.UtcNow };
+        var garage3 = new Garage { Name = "VIP Garaj", Capacity = 20, HotelId = hotel2.Id, CreatedDate = DateTime.UtcNow };
+        var garage4 = new Garage { Name = "Otopark A", Capacity = 40, HotelId = hotel3.Id, CreatedDate = DateTime.UtcNow };
+        var garage5 = new Garage { Name = "Açık Alan", Capacity = 60, HotelId = hotel4.Id, CreatedDate = DateTime.UtcNow };
         
         context.Garages.AddRange(garage1, garage2, garage3, garage4, garage5);
         await context.SaveChangesAsync();
@@ -427,76 +370,37 @@ static async Task SeedData(AppDbContext context)
         // Arabalar
         var cars = new[]
         {
-            new Car { Brand = "BMW", LicensePlate = "34ABC123", OwnerName = "Ahmet Yılmaz", GarageId = garage1.Id },
-            new Car { Brand = "Mercedes", LicensePlate = "34DEF456", OwnerName = "Ayşe Kaya", GarageId = garage1.Id },
-            new Car { Brand = "Audi", LicensePlate = "06GHI789", OwnerName = "Mehmet Demir", GarageId = garage3.Id },
-            new Car { Brand = "Volkswagen", LicensePlate = "35JKL012", OwnerName = "Fatma Özkan", GarageId = garage4.Id },
-            new Car { Brand = "Toyota", LicensePlate = "35MNO345", OwnerName = "Ali Şahin", GarageId = garage5.Id },
-            new Car { Brand = "Honda", LicensePlate = "06PQR678", OwnerName = "Zeynep Akın", GarageId = garage2.Id }
+            new Car { Brand = "BMW", LicensePlate = "34ABC123", OwnerName = "Ahmet Yılmaz", GarageId = garage1.Id, EntryTime = DateTime.UtcNow },
+            new Car { Brand = "Mercedes", LicensePlate = "34DEF456", OwnerName = "Ayşe Kaya", GarageId = garage1.Id, EntryTime = DateTime.UtcNow },
+            new Car { Brand = "Audi", LicensePlate = "06GHI789", OwnerName = "Mehmet Demir", GarageId = garage3.Id, EntryTime = DateTime.UtcNow },
+            new Car { Brand = "Volkswagen", LicensePlate = "35JKL012", OwnerName = "Fatma Özkan", GarageId = garage4.Id, EntryTime = DateTime.UtcNow },
+            new Car { Brand = "Toyota", LicensePlate = "35MNO345", OwnerName = "Ali Şahin", GarageId = garage5.Id, EntryTime = DateTime.UtcNow },
+            new Car { Brand = "Honda", LicensePlate = "06PQR678", OwnerName = "Zeynep Akın", GarageId = garage2.Id, EntryTime = DateTime.UtcNow }
         };
         
         context.Cars.AddRange(cars);
         await context.SaveChangesAsync();
         Console.WriteLine("   ✅ Arabalar eklendi");
 
-        // ✅ Demo kullanıcılar ekleme - YENİ EKLENEN
-        if (!context.Users.Any())
-        {
-            Console.WriteLine("👤 Demo kullanıcılar ekleniyor...");
-            
-            var passwordHasher = new PasswordHasher<User>();
-            
-            var adminUser = new User
-            {
-                Username = "admin",
-                Email = "admin@cityhotelgarage.com",
-                FirstName = "Admin",
-                LastName = "User",
-                Role = "Admin",
-                IsActive = true,
-                CreatedDate = DateTime.UtcNow
-            };
-            adminUser.PasswordHash = passwordHasher.HashPassword(adminUser, "Admin123!");
-            
-            var normalUser = new User
-            {
-                Username = "testuser",
-                Email = "user@cityhotelgarage.com",
-                FirstName = "Test",
-                LastName = "User",
-                Role = "User",
-                IsActive = true,
-                CreatedDate = DateTime.UtcNow
-            };
-            normalUser.PasswordHash = passwordHasher.HashPassword(normalUser, "User123!");
-
-            var managerUser = new User
-            {
-                Username = "manager",
-                Email = "manager@cityhotelgarage.com",
-                FirstName = "Manager",
-                LastName = "User", 
-                Role = "Manager",
-                IsActive = true,
-                CreatedDate = DateTime.UtcNow
-            };
-            managerUser.PasswordHash = passwordHasher.HashPassword(managerUser, "Manager123!");
-            
-            context.Users.AddRange(adminUser, normalUser, managerUser);
-            await context.SaveChangesAsync();
-            Console.WriteLine("   ✅ Demo kullanıcılar eklendi");
-        }
-
         Console.WriteLine("🎉 Demo verileri başarıyla eklendi!");
         Console.WriteLine($"   📊 {context.Cities.Count()} şehir");
         Console.WriteLine($"   🏨 {context.Hotels.Count()} otel");
         Console.WriteLine($"   🅿️  {context.Garages.Count()} garaj");
         Console.WriteLine($"   🚗 {context.Cars.Count()} araba");
-        Console.WriteLine($"   👥 {context.Users.Count()} kullanıcı");
     }
     catch (Exception ex)
     {
         Console.WriteLine($"❌ Demo veri ekleme hatası: {ex.Message}");
         throw;
     }
+}
+
+// JwtConfig class for dependency injection
+public class JwtConfig
+{
+    public string SecretKey { get; set; } = string.Empty;
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public int AccessTokenExpirationMinutes { get; set; } = 60;
+    public int RefreshTokenExpirationDays { get; set; } = 30;
 }

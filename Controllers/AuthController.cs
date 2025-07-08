@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using CityHotelGarage.Business.Operations.DTOs;
 using CityHotelGarage.Business.Operations.Interfaces;
+using FluentValidation; // ← BU USING'İ EKLE
 
 namespace CityHotelGarageAPI.Controllers;
 
@@ -12,10 +13,17 @@ namespace CityHotelGarageAPI.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IValidator<RegisterDto> _registerValidator;  // ← BU PROPERTY'LERİ EKLE
+    private readonly IValidator<LoginDto> _loginValidator;        // ← BU PROPERTY'LERİ EKLE
 
-    public AuthController(IAuthService authService)
+    public AuthController(
+        IAuthService authService,
+        IValidator<RegisterDto> registerValidator,  // ← CONSTRUCTOR'A EKLE
+        IValidator<LoginDto> loginValidator)        // ← CONSTRUCTOR'A EKLE
     {
         _authService = authService;
+        _registerValidator = registerValidator;     // ← ASSIGN ET
+        _loginValidator = loginValidator;           // ← ASSIGN ET
     }
 
     /// <summary>
@@ -24,74 +32,38 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult> Register(RegisterDto registerDto)
     {
+        // ← MANUEL ASYNC VALIDATION EKLE
+        var validationResult = await _registerValidator.ValidateAsync(registerDto);
+        if (!validationResult.IsValid)
+        {
+            var errors = validationResult.Errors
+                .GroupBy(x => x.PropertyName)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => x.ErrorMessage).ToArray()
+                );
+
+            return BadRequest(new
+            {
+                success = false,
+                message = "Validation failed",
+                errors = errors
+            });
+        }
+
         var result = await _authService.RegisterAsync(registerDto);
         
         if (!result.IsSuccess)
         {
             return BadRequest(new { 
+                success = false,
                 message = result.Message, 
                 errors = result.Errors 
             });
         }
 
         return Ok(new { 
-            message = result.Message,
-            data = new {
-                accessToken = result.Data!.AccessToken,
-                refreshToken = result.Data.RefreshToken,
-                expiryDate = result.Data.ExpiryDate,
-                user = result.Data.User,
-                tokenType = "Bearer" // Bearer token olduğunu belirt
-            }
-        });
-    }
-
-    /// <summary>
-    /// Kullanıcı girişi - Bearer Token döner (1 haftalık)
-    /// </summary>
-    [HttpPost("login")]
-    public async Task<ActionResult> Login(LoginDto loginDto)
-    {
-        var result = await _authService.LoginAsync(loginDto);
-        
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new { 
-                message = result.Message, 
-                errors = result.Errors 
-            });
-        }
-
-        return Ok(new { 
-            message = result.Message,
-            data = new {
-                accessToken = result.Data!.AccessToken,
-                refreshToken = result.Data.RefreshToken,
-                expiryDate = result.Data.ExpiryDate,
-                user = result.Data.User,
-                tokenType = "Bearer", // Bearer token olduğunu belirt
-                usage = "Authorization: Bearer " + result.Data.AccessToken.Substring(0, 20) + "..." // Nasıl kullanılacağını göster
-            }
-        });
-    }
-
-    /// <summary>
-    /// Bearer Token yenileme
-    /// </summary>
-    [HttpPost("refresh-token")]
-    public async Task<ActionResult> RefreshToken(RefreshTokenDto refreshTokenDto)
-    {
-        var result = await _authService.RefreshTokenAsync(refreshTokenDto);
-        
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new { 
-                message = result.Message, 
-                errors = result.Errors 
-            });
-        }
-
-        return Ok(new { 
+            success = true,
             message = result.Message,
             data = new {
                 accessToken = result.Data!.AccessToken,
@@ -104,16 +76,91 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Çıkış - Bearer Token iptal et
+    /// Kullanıcı girişi - Bearer Token döner (1 haftalık)
     /// </summary>
+    [HttpPost("login")]
+    public async Task<ActionResult> Login(LoginDto loginDto)
+    {
+        // ← MANUEL ASYNC VALIDATION EKLE
+        var validationResult = await _loginValidator.ValidateAsync(loginDto);
+        if (!validationResult.IsValid)
+        {
+            var errors = validationResult.Errors
+                .GroupBy(x => x.PropertyName)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => x.ErrorMessage).ToArray()
+                );
+
+            return BadRequest(new
+            {
+                success = false,
+                message = "Validation failed",
+                errors = errors
+            });
+        }
+
+        var result = await _authService.LoginAsync(loginDto);
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { 
+                success = false,
+                message = result.Message, 
+                errors = result.Errors 
+            });
+        }
+
+        return Ok(new { 
+            success = true,
+            message = result.Message,
+            data = new {
+                accessToken = result.Data!.AccessToken,
+                refreshToken = result.Data.RefreshToken,
+                expiryDate = result.Data.ExpiryDate,
+                user = result.Data.User,
+                tokenType = "Bearer",
+                usage = "Authorization: Bearer " + result.Data.AccessToken.Substring(0, 20) + "..."
+            }
+        });
+    }
+
+    // ← DİĞER METHODLAR AYNI KALSIN
+    [HttpPost("refresh-token")]
+    public async Task<ActionResult> RefreshToken(RefreshTokenDto refreshTokenDto)
+    {
+        var result = await _authService.RefreshTokenAsync(refreshTokenDto);
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { 
+                success = false,
+                message = result.Message, 
+                errors = result.Errors 
+            });
+        }
+
+        return Ok(new { 
+            success = true,
+            message = result.Message,
+            data = new {
+                accessToken = result.Data!.AccessToken,
+                refreshToken = result.Data.RefreshToken,
+                expiryDate = result.Data.ExpiryDate,
+                user = result.Data.User,
+                tokenType = "Bearer"
+            }
+        });
+    }
+
     [HttpPost("logout")]
-    [Authorize] // Bearer token gerekli
+    [Authorize]
     public async Task<ActionResult> Logout()
     {
         var userId = GetCurrentUserId();
         if (userId == null)
         {
-            return Unauthorized(new { message = "Geçersiz Bearer token" });
+            return Unauthorized(new { success = false, message = "Geçersiz Bearer token" });
         }
 
         var result = await _authService.LogoutAsync(userId.Value);
@@ -121,25 +168,23 @@ public class AuthController : ControllerBase
         if (!result.IsSuccess)
         {
             return BadRequest(new { 
+                success = false,
                 message = result.Message, 
                 errors = result.Errors 
             });
         }
 
-        return Ok(new { message = result.Message });
+        return Ok(new { success = true, message = result.Message });
     }
 
-    /// <summary>
-    /// Şifre değiştirme - Bearer Token gerekli
-    /// </summary>
     [HttpPost("change-password")]
-    [Authorize] // Bearer token gerekli
+    [Authorize]
     public async Task<ActionResult> ChangePassword(ChangePasswordDto changePasswordDto)
     {
         var userId = GetCurrentUserId();
         if (userId == null)
         {
-            return Unauthorized(new { message = "Geçersiz Bearer token" });
+            return Unauthorized(new { success = false, message = "Geçersiz Bearer token" });
         }
 
         var result = await _authService.ChangePasswordAsync(userId.Value, changePasswordDto);
@@ -147,25 +192,23 @@ public class AuthController : ControllerBase
         if (!result.IsSuccess)
         {
             return BadRequest(new { 
+                success = false,
                 message = result.Message, 
                 errors = result.Errors 
             });
         }
 
-        return Ok(new { message = result.Message });
+        return Ok(new { success = true, message = result.Message });
     }
 
-    /// <summary>
-    /// Kullanıcı profili - Bearer Token gerekli
-    /// </summary>
     [HttpGet("profile")]
-    [Authorize] // Bearer token gerekli
+    [Authorize]
     public async Task<ActionResult> GetProfile()
     {
         var userId = GetCurrentUserId();
         if (userId == null)
         {
-            return Unauthorized(new { message = "Geçersiz Bearer token" });
+            return Unauthorized(new { success = false, message = "Geçersiz Bearer token" });
         }
 
         var result = await _authService.GetUserProfileAsync(userId.Value);
@@ -173,22 +216,21 @@ public class AuthController : ControllerBase
         if (!result.IsSuccess)
         {
             return BadRequest(new { 
+                success = false,
                 message = result.Message, 
                 errors = result.Errors 
             });
         }
 
         return Ok(new { 
+            success = true,
             message = result.Message,
             data = result.Data
         });
     }
 
-    /// <summary>
-    /// Bearer Token test endpoint
-    /// </summary>
     [HttpGet("test-bearer-token")]
-    [Authorize] // Bearer token gerekli
+    [Authorize]
     public ActionResult TestBearerToken()
     {
         var userId = GetCurrentUserId();
@@ -197,6 +239,7 @@ public class AuthController : ControllerBase
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
 
         return Ok(new { 
+            success = true,
             message = "Bearer token geçerli!",
             data = new {
                 userId = userId,
@@ -208,14 +251,12 @@ public class AuthController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Admin only endpoint - Bearer Token + Admin role gerekli
-    /// </summary>
     [HttpGet("admin-only")]
-    [Authorize(Roles = "Admin")] // Bearer token + Admin role gerekli
+    [Authorize(Roles = "Admin")]
     public ActionResult AdminOnly()
     {
         return Ok(new { 
+            success = true,
             message = "Bu endpoint sadece Admin rolündeki kullanıcılar için!",
             data = new {
                 username = User.Identity?.Name,

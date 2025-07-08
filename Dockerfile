@@ -1,53 +1,49 @@
-# .NET 8 SDK image kullan
+# Multi-stage build for .NET 8 API with JWT
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 5010
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Her iki proje dosyasını da kopyala
-COPY ["CityHotelGarageAPI/CityHotelGarageAPI.csproj", "CityHotelGarageAPI/"]
-COPY ["CityHotelGarage.Business/CityHotelGarage.Business.csproj", "CityHotelGarage.Business/"]
+# Copy solution file
+COPY *.sln ./
 
-# NuGet restore
-RUN dotnet restore "CityHotelGarageAPI/CityHotelGarageAPI.csproj"
+# Copy project files with correct paths
+COPY CityHotelGarageAPI/CityHotelGarageAPI.csproj ./CityHotelGarageAPI/
+COPY CityHotelGarage.Business/CityHotelGarage.Business.csproj ./CityHotelGarage.Business/
 
-# Tüm kaynak kodları kopyala
+# Restore NuGet packages
+RUN dotnet restore
+
+# Copy all source code
 COPY . .
 
-# Build
-RUN dotnet build "CityHotelGarageAPI/CityHotelGarageAPI.csproj" -c Release -o /app/build
+# Build the application
+WORKDIR /src/CityHotelGarageAPI
+RUN dotnet build -c Release -o /app/build
 
-# Publish
+# Publish stage
 FROM build AS publish
-RUN dotnet publish "CityHotelGarageAPI/CityHotelGarageAPI.csproj" -c Release -o /app/publish
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
-# Runtime - 8.0 tag kullan
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+# Final runtime stage
+FROM base AS final
 WORKDIR /app
 
-# Security packages yükle (curl health check için)
+# Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Non-root user oluştur
-RUN groupadd -r dotnet && useradd -r -g dotnet dotnet
-
-# Published dosyaları kopyala
+# Copy published app
 COPY --from=publish /app/publish .
 
-# Ownership değiştir
-RUN chown -R dotnet:dotnet /app
-
-# Ports
-EXPOSE 5010
-EXPOSE 5011
-
-# Environment variables
+# Set environment for JWT and API
 ENV ASPNETCORE_URLS=http://+:5010
-ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_ENVIRONMENT=Development
 
-# Health check ekle
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+# Health check for container monitoring
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:5010/health || exit 1
 
-# Non-root user olarak çalıştır
-USER dotnet
-
+# Entry point
 ENTRYPOINT ["dotnet", "CityHotelGarageAPI.dll"]

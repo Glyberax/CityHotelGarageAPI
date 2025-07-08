@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using CityHotelGarage.Business.Operations.DTOs;
 using CityHotelGarage.Business.Operations.Interfaces;
 
@@ -6,6 +7,7 @@ namespace CityHotelGarageAPI.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class GaragesController : ControllerBase
 {
     private readonly IGarageService _garageService;

@@ -170,9 +170,9 @@ builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 // Entity Framework DbContext - Docker Configuration
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                           ?? builder.Configuration.GetConnectionString("DefaultConnection") 
-                           ?? "Host=postgres;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512";
+   // var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings_Postgresql_DefaultConnection");
+   var connectionString = builder.Configuration.GetValue<string>("Postgresql:DefaultConnection");
+                          // ?? "Host=postgres;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512";
     
     Console.WriteLine($"🐘 Database Connection: {connectionString.Replace("Password=4512", "Password=***")}");
     
@@ -316,11 +316,11 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-Console.WriteLine($"🌐 Application starting...");
-Console.WriteLine($"🏠 Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine($"📡 Listening on: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5010"}");
-Console.WriteLine($"📚 Swagger UI: http://localhost:5010/swagger");
-Console.WriteLine($"❤️  Health Check: http://localhost:5010/health");
+Console.WriteLine($"Application starting...");
+Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"Listening on: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5010"}");
+Console.WriteLine($"Swagger UI: http://localhost:5010/swagger");
+Console.WriteLine($"Health Check: http://localhost:5010/health");
 
 app.Run();
 
@@ -329,7 +329,7 @@ static async Task SeedData(AppDbContext context)
 {
     if (context.Cities.Any()) 
     {
-        Console.WriteLine("📊 Demo veriler zaten mevcut, seeding atlanıyor.");
+        Console.WriteLine("Demo veriler zaten mevcut, seeding atlanıyor.");
         return;
     }
 
@@ -380,17 +380,17 @@ static async Task SeedData(AppDbContext context)
         
         context.Cars.AddRange(cars);
         await context.SaveChangesAsync();
-        Console.WriteLine("   ✅ Arabalar eklendi");
+        Console.WriteLine("Arabalar eklendi");
 
-        Console.WriteLine("🎉 Demo verileri başarıyla eklendi!");
-        Console.WriteLine($"   📊 {context.Cities.Count()} şehir");
-        Console.WriteLine($"   🏨 {context.Hotels.Count()} otel");
-        Console.WriteLine($"   🅿️  {context.Garages.Count()} garaj");
-        Console.WriteLine($"   🚗 {context.Cars.Count()} araba");
+        Console.WriteLine("Demo verileri başarıyla eklendi!");
+        Console.WriteLine($"{context.Cities.Count()} şehir");
+        Console.WriteLine($"{context.Hotels.Count()} otel");
+        Console.WriteLine($"{context.Garages.Count()} garaj");
+        Console.WriteLine($"{context.Cars.Count()} araba");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Demo veri ekleme hatası: {ex.Message}");
+        Console.WriteLine($"Demo veri ekleme hatası: {ex.Message}");
         throw;
     }
 }

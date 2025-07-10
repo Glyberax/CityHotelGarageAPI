@@ -7,7 +7,7 @@ namespace CityHotelGarageAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] // ← BU SATIRI EKLE - Bearer token zorunlu yapar
+[Authorize] 
 public class CitiesController : ControllerBase
 {
     private readonly ICityService _cityService;
@@ -17,7 +17,7 @@ public class CitiesController : ControllerBase
         _cityService = cityService;
     }
 
-    // GET: api/Cities
+    // GET: api/Cities - Tüm şehirler (eski endpoint)
     [HttpGet]
     public async Task<ActionResult> GetCities()
     {
@@ -31,7 +31,57 @@ public class CitiesController : ControllerBase
         return Ok(new { message = result.Message, data = result.Data });
     }
 
-    // GET: api/Cities/5
+
+    /// <summary>
+    /// Sayfalı şehir listesi - Arama, sıralama ve filtreleme destekli
+    /// </summary>
+    /// <param name="pagingRequest">Sayfalama parametreleri</param>
+    /// <returns>Sayfalı şehir listesi</returns>
+    [HttpGet("paged")]
+    [ProducesResponseType(typeof(PagedResult<CityDto>), 200)]
+    [ProducesResponseType(400)]
+    public async Task<ActionResult> GetPagedCities([FromQuery] PagingRequestDto pagingRequest)
+    {
+        var result = await _cityService.GetPagedCitiesAsync(pagingRequest);
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { 
+                message = result.Message, 
+                errors = result.Errors 
+            });
+        }
+
+        return Ok(result.Data);
+    }
+    
+    /// <param name="searchTerm">Arama terimi</param>
+    /// <param name="limit">Maksimum sonuç sayısı (default: 10)</param>
+    /// <returns>Arama sonuçları</returns>
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(PagedResult<CityDto>), 200)]
+    public async Task<ActionResult> SearchCities([FromQuery] string searchTerm, [FromQuery] int limit = 10)
+    {
+        var pagingRequest = new PagingRequestDto
+        {
+            PageNumber = 1,
+            PageSize = Math.Min(limit, 50), // Max 50 sonuç
+            SearchTerm = searchTerm,
+            SortBy = "name",
+            SortDescending = false
+        };
+
+        var result = await _cityService.GetPagedCitiesAsync(pagingRequest);
+        
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Message });
+        }
+
+        return Ok(result.Data);
+    }
+
+    // GET: api/Cities/{id} - Tekil şehir
     [HttpGet("{id}")]
     public async Task<ActionResult> GetCity(int id)
     {
@@ -45,9 +95,9 @@ public class CitiesController : ControllerBase
         return Ok(new { message = result.Message, data = result.Data });
     }
 
-    // POST: api/Cities
+    // POST: api/Cities - Yeni şehir oluştur
     [HttpPost]
-    public async Task<ActionResult> CreateCity(CityCreateDto cityDto) // ✅ Method ismi tutarlı
+    public async Task<ActionResult> CreateCity(CityCreateDto cityDto)
     {
         var result = await _cityService.CreateCityAsync(cityDto);
         
@@ -61,11 +111,10 @@ public class CitiesController : ControllerBase
             new { message = result.Message, data = result.Data });
     }
 
-    // PUT: api/Cities (Body'deki ID kullanılır)
+    // PUT: api/Cities - Şehir güncelle
     [HttpPut]
-    public async Task<ActionResult> UpdateCity(CityUpdateDto cityDto) // ✅ CityUpdateDto + URL'den ID kaldırıldı
+    public async Task<ActionResult> UpdateCity(CityUpdateDto cityDto)
     {
-        // Body'deki ID'yi kullan
         var result = await _cityService.UpdateCityAsync(cityDto.Id, cityDto);
         
         if (!result.IsSuccess)
@@ -76,7 +125,7 @@ public class CitiesController : ControllerBase
         return Ok(new { message = result.Message, data = result.Data });
     }
 
-    // DELETE: api/Cities (Body'deki ID kullanılır)
+    // DELETE: api/Cities - Şehir sil
     [HttpDelete]
     public async Task<ActionResult> DeleteCity(CityDeleteDto deleteDto)
     {

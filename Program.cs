@@ -21,7 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 🚀 CACHE CONFIGURATION - BURAYA EKLEDİK
+// 🚀 CACHE CONFIGURATION 
 // Memory Cache Configuration
 builder.Services.AddMemoryCache(options =>
 {

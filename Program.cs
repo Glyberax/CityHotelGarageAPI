@@ -21,6 +21,27 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
+// 🚀 CACHE CONFIGURATION - BURAYA EKLEDİK
+// Memory Cache Configuration
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 100; // Maximum 100 cache entry
+    options.CompactionPercentage = 0.25; // %25'ini temizle
+});
+
+// Cache Service - Custom cache helper
+builder.Services.AddScoped<ICacheService, CacheService>();
+
+// Response Caching (HTTP level)
+builder.Services.AddResponseCaching();
+
+Console.WriteLine("Memory Cache yapılandırıldı");
+Console.WriteLine("Cache Süreleri:");
+Console.WriteLine("Cities: 4 saat (240 dakika)");
+Console.WriteLine("Hotels All: 45 dakika");
+Console.WriteLine("Hotels by City: 30 dakika");
+Console.WriteLine("Specific records: 1-2 saat");
+
 // Swagger Configuration with JWT Support
 builder.Services.AddSwaggerGen(options =>
 {
@@ -75,11 +96,11 @@ var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience") ?? "CityHo
 var jwtExpiryMinutes = int.Parse(Environment.GetEnvironmentVariable("JWT__ExpiryMinutes") ?? "60");
 
 // JWT Debug Info
-Console.WriteLine($"🔐 JWT Configuration:");
-Console.WriteLine($"   Issuer: {jwtIssuer}");
-Console.WriteLine($"   Audience: {jwtAudience}");
-Console.WriteLine($"   Expiry: {jwtExpiryMinutes} minutes");
-Console.WriteLine($"   SecretKey Length: {jwtSecretKey.Length} characters");
+Console.WriteLine($"JWT Configuration:");
+Console.WriteLine($" Issuer: {jwtIssuer}");
+Console.WriteLine($" Audience: {jwtAudience}");
+Console.WriteLine($" Expiry: {jwtExpiryMinutes} minutes");
+Console.WriteLine($" SecretKey Length: {jwtSecretKey.Length} characters");
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -107,17 +128,17 @@ builder.Services.AddAuthentication(options =>
     {
         OnAuthenticationFailed = context =>
         {
-            Console.WriteLine($"🚫 JWT Authentication failed: {context.Exception.Message}");
+            Console.WriteLine($"JWT Authentication failed: {context.Exception.Message}");
             return Task.CompletedTask;
         },
         OnTokenValidated = context =>
         {
-            Console.WriteLine("✅ JWT Token validated successfully");
+            Console.WriteLine("JWT Token validated successfully");
             return Task.CompletedTask;
         },
         OnChallenge = context =>
         {
-            Console.WriteLine($"🔍 JWT Challenge: {context.Error} - {context.ErrorDescription}");
+            Console.WriteLine($"JWT Challenge: {context.Error} - {context.ErrorDescription}");
             return Task.CompletedTask;
         }
     };
@@ -171,10 +192,10 @@ builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
    // var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings_Postgresql_DefaultConnection");
-   var connectionString = builder.Configuration.GetValue<string>("Postgresql:DefaultConnection");
+   var connectionString = "Host=localhost;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512";
                           // ?? "Host=postgres;Port=5432;Database=CityHotelGarageDB;Username=postgres;Password=4512";
     
-    Console.WriteLine($"🐘 Database Connection: {connectionString.Replace("Password=4512", "Password=***")}");
+    Console.WriteLine($"Database Connection: {connectionString.Replace("Password=4512", "Password=***")}");
     
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
@@ -260,6 +281,9 @@ app.Use(async (context, next) =>
 // CORS
 app.UseCors("AllowSpecificOrigins");
 
+// RESPONSE CACHING MIDDLEWARE 
+app.UseResponseCaching();
+
 // Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
@@ -289,6 +313,36 @@ app.MapGet("/health", async (AppDbContext context) =>
     }
 }).WithTags("Health");
 
+// CACHE STATUS ENDPOINT 
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/api/cache/status", (ICacheService cacheService) =>
+    {
+        var info = new
+        {
+            Message = "Cache Service Aktif",
+            Environment = "Development",
+            CacheKeys = new[]
+            {
+                "cities:all",
+                "hotels:all",
+                "hotels:city:*",
+                "cities:id:*",
+                "hotels:id:*"
+            },
+            CacheDurations = new
+            {
+                Cities = "4 saat",
+                HotelsAll = "45 dakika",
+                HotelsByCity = "30 dakika",
+                SpecificRecords = "1-2 saat"
+            }
+        };
+        
+        return Results.Ok(info);
+    }).WithTags("Cache").WithOpenApi();
+}
+
 // Controllers
 app.MapControllers();
 
@@ -299,19 +353,19 @@ using (var scope = app.Services.CreateScope())
     {
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         
-        Console.WriteLine("🔄 Checking database connection...");
+        Console.WriteLine("Checking database connection...");
         await context.Database.EnsureCreatedAsync();
         
-        Console.WriteLine("🚀 Database is ready!");
+        Console.WriteLine("Database is ready!");
         
         // Demo verileri ekle
         await SeedData(context);
         
-        Console.WriteLine("🎯 Database ready with demo data!");
+        Console.WriteLine("Database ready with demo data!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Database setup error: {ex.Message}");
+        Console.WriteLine($"Database setup error: {ex.Message}");
         throw;
     }
 }
@@ -321,6 +375,7 @@ Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
 Console.WriteLine($"Listening on: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://localhost:5010"}");
 Console.WriteLine($"Swagger UI: http://localhost:5010/swagger");
 Console.WriteLine($"Health Check: http://localhost:5010/health");
+Console.WriteLine($"Cache Status: http://localhost:5010/api/cache/status");
 
 app.Run();
 
@@ -333,7 +388,7 @@ static async Task SeedData(AppDbContext context)
         return;
     }
 
-    Console.WriteLine("🌱 Demo verileri ekleniyor...");
+    Console.WriteLine("Demo verileri ekleniyor...");
 
     try
     {
@@ -344,7 +399,7 @@ static async Task SeedData(AppDbContext context)
         
         context.Cities.AddRange(istanbul, ankara, izmir);
         await context.SaveChangesAsync();
-        Console.WriteLine("   ✅ Şehirler eklendi");
+        Console.WriteLine("Şehirler eklendi");
 
         // Oteller
         var hotel1 = new Hotel { Name = "Grand Hotel", Yildiz = 5, CityId = istanbul.Id, CreatedDate = DateTime.UtcNow };
@@ -354,7 +409,7 @@ static async Task SeedData(AppDbContext context)
         
         context.Hotels.AddRange(hotel1, hotel2, hotel3, hotel4);
         await context.SaveChangesAsync();
-        Console.WriteLine("   ✅ Oteller eklendi");
+        Console.WriteLine("Oteller eklendi");
 
         // Garajlar
         var garage1 = new Garage { Name = "Ana Garaj", Capacity = 50, HotelId = hotel1.Id, CreatedDate = DateTime.UtcNow };
@@ -365,7 +420,7 @@ static async Task SeedData(AppDbContext context)
         
         context.Garages.AddRange(garage1, garage2, garage3, garage4, garage5);
         await context.SaveChangesAsync();
-        Console.WriteLine("   ✅ Garajlar eklendi");
+        Console.WriteLine("Garajlar eklendi");
 
         // Arabalar
         var cars = new[]
